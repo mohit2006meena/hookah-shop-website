@@ -25,6 +25,10 @@ if (navToggle && nav) {
   });
 }
 
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 860) closeNav();
+});
+
 /* Navbar shrink + progress + back to top */
 const navbar = document.getElementById('navbar');
 const progressBar = document.getElementById('progressBar');
@@ -104,10 +108,12 @@ document.addEventListener('DOMContentLoaded', initGSAP);
 
 /* Shared 3D tilt for premium card feel */
 function initCardTilt() {
+  const allowTilt = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!allowTilt || prefersReduced) return;
+
   const cards = document.querySelectorAll('.glass-panel, .product-card');
   cards.forEach((card) => {
     card.addEventListener('mousemove', (e) => {
-      if (prefersReduced) return;
       const rect = card.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -175,21 +181,22 @@ if (featuredTrack) {
     featuredTrack.appendChild(card);
   });
 
-  let idx = 0;
   const prev = document.getElementById('prevFeatured');
   const next = document.getElementById('nextFeatured');
-  const update = () => {
-    featuredTrack.style.transform = `translateX(-${idx * 320}px)`;
+  const getStep = () => {
+    const firstCard = featuredTrack.querySelector('.carousel-card');
+    if (!(firstCard instanceof HTMLElement)) return 280;
+    const style = window.getComputedStyle(featuredTrack);
+    const gap = Number.parseFloat(style.columnGap || style.gap || '16') || 16;
+    return firstCard.offsetWidth + gap;
   };
 
   if (prev && next) {
     prev.onclick = () => {
-      idx = Math.max(0, idx - 1);
-      update();
+      featuredTrack.scrollBy({ left: -getStep(), behavior: 'smooth' });
     };
     next.onclick = () => {
-      idx = Math.min(featuredData.length - 1, idx + 1);
-      update();
+      featuredTrack.scrollBy({ left: getStep(), behavior: 'smooth' });
     };
   }
 }

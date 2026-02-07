@@ -26,6 +26,9 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -37,6 +40,8 @@ body {
   background-image: var(--bg-grad);
   min-height: 100vh;
   text-rendering: optimizeLegibility;
+  width: 100%;
+  max-width: 100%;
 }
 
 img {
@@ -58,6 +63,7 @@ a {
 .section {
   padding: clamp(5rem, 8vw, 8rem) 0;
   position: relative;
+  width: 100%;
 }
 
 .section-heading {
@@ -295,7 +301,7 @@ p {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: var(--space-lg);
   align-items: center;
 }
@@ -333,6 +339,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  min-width: 0;
 }
 
 .hero-copy .lede {
@@ -369,12 +376,14 @@ p {
 .hero-card {
   display: grid;
   grid-template-rows: auto auto;
+  min-width: 0;
 }
 
 .hero-card img {
   width: 100%;
   height: 330px;
   object-fit: cover;
+  aspect-ratio: 4 / 3;
 }
 
 .hero-card-body {
@@ -466,12 +475,14 @@ p {
 }
 
 .carousel {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(250px, 310px);
+  display: flex;
   gap: 1rem;
-  overflow: hidden;
-  transition: transform 0.3s ease;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 0.4rem;
 }
 
 .carousel-card {
@@ -479,6 +490,8 @@ p {
   border-radius: var(--radius);
   overflow: hidden;
   height: 340px;
+  flex: 0 0 min(310px, 82vw);
+  scroll-snap-align: start;
 }
 
 .carousel-card img {
@@ -1496,13 +1509,13 @@ textarea {
 }
 
 .whatsapp {
-  bottom: 82px;
+  bottom: 20px;
   background: linear-gradient(135deg, #25d366, #128c7e);
   color: #fff;
 }
 
 .to-top {
-  bottom: 92px;
+  bottom: 78px;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1581,6 +1594,16 @@ body.nav-open {
 }
 
 @media (max-width: 1120px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 1.4rem;
+  }
+
+  .hero-card {
+    max-width: 620px;
+    width: 100%;
+  }
+
   .flavor-layout {
     grid-template-columns: 1fr;
   }
@@ -1599,6 +1622,14 @@ body.nav-open {
 }
 
 @media (max-width: 860px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .section {
+    padding: clamp(3.2rem, 10vw, 4.5rem) 0;
+  }
+
   .navbar {
     top: 0;
     left: 0;
@@ -1650,11 +1681,35 @@ body.nav-open {
     min-width: 100%;
   }
 
+  .filters {
+    width: 100%;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .chip-group {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+  }
+
+  .chip-group .chip {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  #sortSelect {
+    width: 100%;
+  }
+
   .hero {
     padding-top: 110px;
+    min-height: auto;
   }
 
   .hero-grid {
+    grid-template-columns: 1fr;
     gap: 1.4rem;
   }
 
@@ -1670,10 +1725,25 @@ body.nav-open {
   .cta-row .btn {
     flex: 1;
     justify-content: center;
+    min-width: 0;
+  }
+
+  .stat-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat {
+    min-width: 0;
+    width: 100%;
   }
 
   .carousel {
-    grid-auto-columns: minmax(240px, 260px);
+    padding-bottom: 0.55rem;
+  }
+
+  .carousel-card {
+    flex-basis: min(260px, 76vw);
   }
 
   .flavor-visual {
@@ -1715,9 +1785,47 @@ body.nav-open {
     animation: none;
     opacity: 0.15;
   }
+
+  .whatsapp {
+    bottom: 74px;
+  }
+
+  .to-top {
+    bottom: 130px;
+  }
 }
 
 @media (max-width: 520px) {
+  .logo {
+    font-size: 1.05rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 9vw, 2.45rem);
+  }
+
+  .hero-card img {
+    height: 230px;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-card img {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .masonry {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 210px;
+  }
+
+  .gallery-item[data-span='2'] {
+    grid-row: span 1;
+  }
+
   .cart-drawer {
     width: 100vw;
   }
