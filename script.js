@@ -604,6 +604,7 @@ document.addEventListener('submit', (event) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  closeNav();
   closeModal();
   closeLightbox();
   closeCart();
