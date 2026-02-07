@@ -221,6 +221,21 @@ p {
   background: #fff;
 }
 
+.nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 950;
+}
+
+.nav-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .cart-toggle {
   display: inline-flex;
   align-items: center;
@@ -1501,6 +1516,10 @@ textarea {
   pointer-events: auto;
 }
 
+body.nav-open {
+  overflow: hidden;
+}
+
 .smoke-layer {
   position: fixed;
   inset: 0;
@@ -1607,6 +1626,7 @@ textarea {
     gap: 1rem;
     transform: translateY(-120%);
     transition: transform 0.3s ease;
+    z-index: 960;
   }
 
   .nav-links.open {
@@ -1628,6 +1648,28 @@ textarea {
 
   .search-input {
     min-width: 100%;
+  }
+
+  .hero {
+    padding-top: 110px;
+  }
+
+  .hero-grid {
+    gap: 1.4rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 7vw, 2.8rem);
+    line-height: 1.05;
+  }
+
+  .cta-row {
+    width: 100%;
+  }
+
+  .cta-row .btn {
+    flex: 1;
+    justify-content: center;
   }
 
   .carousel {

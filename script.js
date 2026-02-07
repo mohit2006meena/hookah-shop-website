@@ -4,8 +4,25 @@ const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 /* Nav toggle */
 const nav = document.getElementById('navLinks');
 const navToggle = document.getElementById('navToggle');
-if (navToggle) {
-  navToggle.addEventListener('click', () => nav.classList.toggle('open'));
+const navOverlay = document.getElementById('navOverlay');
+
+function closeNav() {
+  if (!nav) return;
+  nav.classList.remove('open');
+  document.body.classList.remove('nav-open');
+  if (navOverlay) navOverlay.classList.remove('open');
+}
+
+if (navToggle && nav) {
+  navToggle.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    const isOpen = nav.classList.contains('open');
+    document.body.classList.toggle('nav-open', isOpen);
+    if (navOverlay) navOverlay.classList.toggle('open', isOpen);
+  });
+  nav.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', closeNav);
+  });
 }
 
 /* Navbar shrink + progress + back to top */
@@ -490,6 +507,11 @@ function closeModal() {
 document.addEventListener('click', (e) => {
   const target = e.target;
   if (!(target instanceof Element)) return;
+
+  if (navOverlay && target === navOverlay) {
+    closeNav();
+    return;
+  }
 
   const quickTrigger = target.closest('[data-quick]');
   if (quickTrigger && quickTrigger.dataset.quick) {
