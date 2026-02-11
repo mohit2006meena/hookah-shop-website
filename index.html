@@ -234,58 +234,22 @@ Open: http://localhost:5500/index.html
 
     <section class="section testimonials" id="testimonials">
       <div class="container">
-        <p class="eyebrow testimonials-eyebrow">Testimonials</p>
+        <p class="eyebrow testimonials-eyebrow">Google Reviews</p>
         <h2 class="testimonials-heading">
-          What Our <span class="text-rainbow">Clients</span> Say
+          Latest Guest <span class="text-rainbow">Feedback</span>
         </h2>
-        <div class="testimonial-grid">
-          <article class="testimonial-card glass-panel">
-            <div class="quote-symbol">"</div>
-            <div class="star-row" aria-label="5 star rating">★★★★★</div>
-            <p class="testimonial-text">
-              The craftsmanship is absolutely stunning. Every detail speaks of quality and the smoking experience is
-              unmatched. Best investment I have made.
-            </p>
-            <div class="reviewer">
-              <div class="reviewer-avatar">A</div>
-              <div>
-                <h4>Alexander Chen</h4>
-                <p class="subtle">Luxury Enthusiast</p>
-              </div>
-            </div>
-          </article>
-
-          <article class="testimonial-card glass-panel">
-            <div class="quote-symbol">"</div>
-            <div class="star-row" aria-label="5 star rating">★★★★★</div>
-            <p class="testimonial-text">
-              Not just a hookah, it is a statement piece. The Royal Gold Classic looks incredible in my lounge.
-              Exceptional design and smooth pull quality.
-            </p>
-            <div class="reviewer">
-              <div class="reviewer-avatar">S</div>
-              <div>
-                <h4>Sofia Martinez</h4>
-                <p class="subtle">Interior Designer</p>
-              </div>
-            </div>
-          </article>
-
-          <article class="testimonial-card glass-panel">
-            <div class="quote-symbol">"</div>
-            <div class="star-row" aria-label="5 star rating">★★★★★</div>
-            <p class="testimonial-text">
-              We equipped our VIP lounge with Sheesha Hookah units and guests love them. Product quality is premium and
-              customer service is consistently great.
-            </p>
-            <div class="reviewer">
-              <div class="reviewer-avatar">J</div>
-              <div>
-                <h4>James Wilson</h4>
-                <p class="subtle">Restaurant Owner</p>
-              </div>
-            </div>
-          </article>
+        <p class="subtle center reviews-status" id="googleReviewsStatus">Loading latest Google reviews...</p>
+        <div class="testimonial-grid" id="googleReviewsGrid"></div>
+        <div class="reviews-link-wrap">
+          <a
+            class="btn btn-ghost reviews-link"
+            id="googleReviewsLink"
+            href="https://share.google/YnWp1UfxyE2ImFTRb"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View all reviews on Google
+          </a>
         </div>
       </div>
     </section>
@@ -370,6 +334,7 @@ Open: http://localhost:5500/index.html
     <div class="subtle center notice">18+ only. Tobacco consumption is injurious to health. Copyright 2025 SHEESHA HOOKAH.</div>
   </footer>
 
+  <script src="google-reviews-config.js" defer></script>
   <script src="script.js" defer></script>
 </body>
 </html>

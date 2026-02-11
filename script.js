@@ -11,18 +11,25 @@ function closeNav() {
   nav.classList.remove('open');
   document.body.classList.remove('nav-open');
   if (navOverlay) navOverlay.classList.remove('open');
+  if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
 }
 
 if (navToggle && nav) {
+  navToggle.setAttribute('aria-expanded', 'false');
   navToggle.addEventListener('click', () => {
     nav.classList.toggle('open');
     const isOpen = nav.classList.contains('open');
     document.body.classList.toggle('nav-open', isOpen);
     if (navOverlay) navOverlay.classList.toggle('open', isOpen);
+    navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   });
   nav.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', closeNav);
   });
+}
+
+if (navOverlay) {
+  navOverlay.addEventListener('click', closeNav);
 }
 
 window.addEventListener('resize', () => {
@@ -130,6 +137,209 @@ function initCardTilt() {
   });
 }
 document.addEventListener('DOMContentLoaded', initCardTilt);
+
+/* Google reviews (live Places API + graceful fallback) */
+let googlePlacesLoaderPromise;
+
+function escapeReviewHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatReviewDate(unixSeconds) {
+  if (!Number.isFinite(unixSeconds)) return '';
+  try {
+    return new Date(unixSeconds * 1000).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  } catch (_error) {
+    return '';
+  }
+}
+
+function getInitials(name) {
+  const words = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return 'G';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+}
+
+function getStars(rating) {
+  const clamped = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+  return `${'★'.repeat(clamped)}${'☆'.repeat(5 - clamped)}`;
+}
+
+function setReviewStatus(statusEl, text, isError = false) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.classList.toggle('is-error', isError);
+}
+
+function renderGoogleReviews(gridEl, reviews) {
+  if (!gridEl) return;
+
+  if (!Array.isArray(reviews) || !reviews.length) {
+    gridEl.innerHTML = `
+      <article class="glass-panel testimonial-card review-empty-card">
+        <span class="quote-symbol">"</span>
+        <p class="testimonial-text">Latest reviews are unavailable here right now. Tap the Google button below to see live guest feedback.</p>
+        <div class="reviewer">
+          <div class="reviewer-avatar" aria-hidden="true">G</div>
+          <div>
+            <strong>Google Reviews</strong>
+            <p class="subtle review-time">Live updates available on Google</p>
+          </div>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  gridEl.innerHTML = reviews
+    .map((review) => {
+      const author = escapeReviewHtml(review.author_name || 'Google Guest');
+      const quote = escapeReviewHtml(review.text || '');
+      const stars = getStars(review.rating);
+      const timeLabel = escapeReviewHtml(review.relative_time_description || formatReviewDate(review.time) || 'Recent');
+      const avatarUrl = escapeReviewHtml(review.profile_photo_url || '');
+      const avatarMarkup = avatarUrl
+        ? `<img src="${avatarUrl}" alt="${author}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
+        : escapeReviewHtml(getInitials(author));
+
+      return `
+        <article class="glass-panel testimonial-card">
+          <span class="quote-symbol">"</span>
+          <p class="star-row" aria-label="Rated ${Number(review.rating) || 0} out of 5">${stars}</p>
+          <p class="testimonial-text">${quote}</p>
+          <div class="reviewer">
+            <div class="reviewer-avatar">${avatarMarkup}</div>
+            <div class="review-meta">
+              <strong>${author}</strong>
+              <p class="subtle review-time">${timeLabel}</p>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+}
+
+function loadGooglePlaces(apiKey) {
+  if (window.google && window.google.maps && window.google.maps.places) {
+    return Promise.resolve();
+  }
+
+  if (googlePlacesLoaderPromise) return googlePlacesLoaderPromise;
+
+  googlePlacesLoaderPromise = new Promise((resolve, reject) => {
+    const callbackName = `__sheeshaGooglePlacesInit_${Date.now()}`;
+    const script = document.createElement('script');
+
+    window[callbackName] = () => {
+      delete window[callbackName];
+      resolve();
+    };
+
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googlePlacesLoader = 'true';
+
+    script.onerror = () => {
+      delete window[callbackName];
+      reject(new Error('Google Maps script failed to load'));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return googlePlacesLoaderPromise;
+}
+
+function fetchGooglePlaceDetails(placeId) {
+  return new Promise((resolve, reject) => {
+    if (!(window.google && window.google.maps && window.google.maps.places)) {
+      reject(new Error('Google Places SDK unavailable'));
+      return;
+    }
+
+    const serviceTarget = document.createElement('div');
+    const service = new window.google.maps.places.PlacesService(serviceTarget);
+
+    service.getDetails(
+      {
+        placeId,
+        fields: ['name', 'url', 'rating', 'user_ratings_total', 'reviews']
+      },
+      (result, status) => {
+        if (status !== window.google.maps.places.PlacesServiceStatus.OK || !result) {
+          reject(new Error(`Google Places status: ${status}`));
+          return;
+        }
+
+        const sortedReviews = Array.isArray(result.reviews)
+          ? [...result.reviews].sort((a, b) => (b.time || 0) - (a.time || 0))
+          : [];
+
+        resolve({
+          url: result.url || '',
+          rating: Number(result.rating) || 0,
+          totalRatings: Number(result.user_ratings_total) || 0,
+          reviews: sortedReviews
+        });
+      }
+    );
+  });
+}
+
+async function initGoogleReviewsSection() {
+  const gridEl = document.getElementById('googleReviewsGrid');
+  if (!gridEl) return;
+
+  const statusEl = document.getElementById('googleReviewsStatus');
+  const linkEl = document.getElementById('googleReviewsLink');
+  const config = window.googleReviewsConfig || {};
+  const apiKey = String(config.apiKey || '').trim();
+  const placeId = String(config.placeId || '').trim();
+  const mapUrl = String(config.mapUrl || '').trim() || 'https://share.google/YnWp1UfxyE2ImFTRb';
+
+  if (linkEl) linkEl.href = mapUrl;
+
+  if (!apiKey || !placeId) {
+    renderGoogleReviews(gridEl, []);
+    setReviewStatus(statusEl, 'Add API key and Place ID in google-reviews-config.js to sync latest Google reviews.', true);
+    return;
+  }
+
+  setReviewStatus(statusEl, 'Loading latest Google reviews...');
+
+  try {
+    await loadGooglePlaces(apiKey);
+    const details = await fetchGooglePlaceDetails(placeId);
+
+    if (linkEl && details.url) linkEl.href = details.url;
+    renderGoogleReviews(gridEl, details.reviews.slice(0, 3));
+
+    const ratingText = details.rating > 0 ? `${details.rating.toFixed(1)} rating` : 'Guest ratings';
+    const countText = details.totalRatings > 0 ? `${details.totalRatings} total reviews` : 'Live on Google';
+    setReviewStatus(statusEl, `Live from Google: ${ratingText} · ${countText}`);
+  } catch (error) {
+    console.error('Failed to load Google reviews', error);
+    renderGoogleReviews(gridEl, []);
+    setReviewStatus(statusEl, 'Google reviews are temporarily unavailable here. Tap below to view live reviews on Google.', true);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initGoogleReviewsSection);
 
 /* Featured carousel (home) */
 const featuredData = [
@@ -286,68 +496,117 @@ const products = [
   }
 ];
 
-const flavorCatalog = [
-  {
-    id: 'flavor-double-apple-premium',
-    name: 'Double Apple',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Sweet anise and red apple profile',
-    image: 'assets/gallery/Traditional-Brass-Hookah.jpg',
-    rating: 4.8
-  },
-  {
-    id: 'flavor-fresh-mint-premium',
-    name: 'Fresh Mint',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Chilled mint for smooth lounge pulls',
-    image: 'assets/gallery/premium-glass-hookah.jpg',
-    rating: 4.8
-  },
-  {
-    id: 'flavor-wild-berry-premium',
-    name: 'Wild Berry',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Bold berry aroma with long finish',
-    image: 'assets/gallery/Classic-Brass-Hookah.jpg',
-    rating: 4.7
-  },
-  {
-    id: 'flavor-grape-fusion-premium',
-    name: 'Grape Fusion',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Deep grape notes and smooth clouds',
-    image: 'assets/gallery/Classic-Brass-Hookah.jpg',
-    rating: 4.7
-  },
-  {
-    id: 'flavor-citrus-burst-premium',
-    name: 'Citrus Burst',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Zesty citrus finish with light sweetness',
-    image: 'assets/gallery/shop-front.jpg',
-    rating: 4.6
-  },
-  {
-    id: 'flavor-spiced-mix-premium',
-    name: 'Spiced Mix',
-    type: 'flavors',
-    price: 499,
-    badge: 'Premium Blend',
-    note: 'Warm aromatic spices for rich sessions',
-    image: 'assets/gallery/owner.jpg',
-    rating: 4.6
-  }
+const shopFlavorCatalogHost = document.getElementById('shopFlavorCatalog');
+const rawFlavors = Array.isArray(window.flavors) ? window.flavors : [];
+const fallbackFlavorSeed = [
+  { name: 'Double Apple', price: '100', category: 'Anise/Apple', intensity: 'High', mixins: 'Pan Raas' },
+  { name: 'Fresh Mint', price: '100', category: 'Mint/Cool', intensity: 'Medium', mixins: 'Lemon' },
+  { name: 'Wild Berry', price: '100', category: 'Floral/Berry', intensity: 'Medium', mixins: 'Vanilla' },
+  { name: 'Grape Fusion', price: '100', category: 'Fruit', intensity: 'Medium', mixins: 'Mint' },
+  { name: 'Citrus Burst', price: '100', category: 'Citrus', intensity: 'Medium', mixins: 'Double Apple' },
+  { name: 'Spiced Mix', price: '100', category: 'Spicy/Sweet', intensity: 'High', mixins: 'Cinnamon' }
 ];
+const flavorSeed = rawFlavors.length ? rawFlavors : fallbackFlavorSeed;
+const flavorPreviewImages = [
+  'assets/gallery/Traditional-Brass-Hookah.jpg',
+  'assets/gallery/premium-glass-hookah.jpg',
+  'assets/gallery/Classic-Brass-Hookah.jpg',
+  'assets/gallery/shop-front.jpg',
+  'assets/gallery/owner.jpg'
+];
+
+function slugifyFlavor(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function parseFlavorPrice(value) {
+  const parsed = Number.parseInt(String(value || '').replace(/\D/g, ''), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getIntensityRating(intensity) {
+  const token = String(intensity || '').trim().toLowerCase();
+  if (token === 'very high') return 5;
+  if (token === 'high') return 4.8;
+  if (token === 'medium') return 4.6;
+  return 4.4;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getIntensityClassName(intensity) {
+  const token = String(intensity || '').trim().toLowerCase();
+  if (token === 'very high') return 'shop-intensity-highest';
+  if (token === 'high') return 'shop-intensity-high';
+  if (token === 'medium') return 'shop-intensity-medium';
+  return 'shop-intensity-low';
+}
+
+const flavorCatalog = flavorSeed.map((flavor, index) => {
+  const name = String(flavor.name || '').trim();
+  const price = parseFlavorPrice(flavor.price);
+  const category = String(flavor.category || 'Classic Blend').trim();
+  const intensity = String(flavor.intensity || 'Medium').trim();
+  const mixins = String(flavor.mixins || 'Mint').trim();
+
+  return {
+    id: `flavor-${slugifyFlavor(name)}`,
+    name,
+    type: 'flavors',
+    price,
+    badge: `${intensity} Intensity`,
+    note: `${category} blend with ${mixins}`,
+    image: flavorPreviewImages[index % flavorPreviewImages.length],
+    rating: getIntensityRating(intensity),
+    category,
+    intensity,
+    mixins
+  };
+});
+
+function renderShopFlavorCatalog() {
+  if (!shopFlavorCatalogHost) return;
+
+  shopFlavorCatalogHost.innerHTML = flavorCatalog
+    .map(
+      (item) => `
+        <article class="glass-panel shop-flavor-card">
+          <div class="shop-flavor-head">
+            <h3>${escapeHtml(item.name)}</h3>
+            <span class="shop-flavor-price">${formatCurrency(item.price)}</span>
+          </div>
+          <div class="shop-flavor-row">
+            <span class="shop-flavor-label">Category</span>
+            <span class="shop-flavor-value">${escapeHtml(item.category)}</span>
+          </div>
+          <div class="shop-flavor-row">
+            <span class="shop-flavor-label">Intensity</span>
+            <span class="shop-intensity ${getIntensityClassName(item.intensity)}">${escapeHtml(item.intensity)}</span>
+          </div>
+          <div class="shop-flavor-row">
+            <span class="shop-flavor-label">Recommended Mix-ins</span>
+            <span class="shop-flavor-value">${escapeHtml(item.mixins)}</span>
+          </div>
+          <div class="shop-flavor-actions">
+            <button class="btn-mini" type="button" data-add-cart="${item.id}">Add to cart</button>
+            <a class="chip" href="https://wa.me/917790813469?text=${encodeURIComponent(`I want ${item.name} flavor`)}" target="_blank" rel="noopener noreferrer">Ask</a>
+          </div>
+        </article>
+      `
+    )
+    .join('');
+}
 
 const catalogById = new Map();
 const catalogByName = new Map();
@@ -474,6 +733,8 @@ if (productGrid) {
 
   renderProducts(currentFilter, currentSort, currentQuery);
 }
+
+renderShopFlavorCatalog();
 
 /* Quick view modal */
 const modal = document.getElementById('productModal');

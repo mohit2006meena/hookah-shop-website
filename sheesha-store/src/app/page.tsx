@@ -36,7 +36,7 @@ export default function HomePage() {
 
         <div className="relative grid gap-8 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div className="space-y-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#1bb8a0]">Jaipur | Since 2015</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#1bb8a0]">Jaipur | Since 2020</p>
             <h1 className="text-5xl leading-[0.92] text-white sm:text-6xl">
               Redefine Your
               <span className="block text-gradient">Hookah Ritual</span>
@@ -64,7 +64,7 @@ export default function HomePage() {
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="lux-card p-3">
-                <p className="text-2xl font-semibold text-white">9+</p>
+                <p className="text-2xl font-semibold text-white">6+</p>
                 <p className="text-xs uppercase tracking-[0.12em] text-white/55">Years Serving</p>
               </div>
               <div className="lux-card p-3">

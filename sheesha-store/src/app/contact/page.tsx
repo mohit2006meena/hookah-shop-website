@@ -29,7 +29,7 @@ export default function ContactPage() {
           <div>
             <h2 className="text-2xl text-white">Store Details</h2>
             <p className="text-sm text-white/70">SHEESHA HOOKAH, Jaipur</p>
-            <p className="mt-1 text-sm text-white/70">Open daily: 11:00 AM - 11:30 PM</p>
+            <p className="mt-1 text-sm text-white/70">Open daily: 11:00 AM - 10:00 PM</p>
           </div>
 
           <a
@@ -94,7 +94,7 @@ export default function ContactPage() {
           </details>
           <details className="rounded-xl border border-white/10 bg-black/20 p-3">
             <summary className="cursor-pointer text-white">Payment options</summary>
-            <p className="mt-2 text-white/70">UPI, cards, and cash on delivery are supported.</p>
+            <p className="mt-2 text-white/70">UPI payments are supported.</p>
           </details>
           <details className="rounded-xl border border-white/10 bg-black/20 p-3">
             <summary className="cursor-pointer text-white">Delivery radius</summary>

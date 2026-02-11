@@ -2,12 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { products } from '@/lib/catalog';
-import type { CartLine, CheckoutPayload, Order, SavedAddress, ShippingMode } from '@/lib/types';
+import type { CartLine, Order, SavedAddress, ShippingMode } from '@/lib/types';
 import { cartCount, getVariant, linePrice } from '@/lib/utils';
-
-type PlaceOrderOptions = {
-  saveAddressLabel?: string;
-};
 
 type StoreContextValue = {
   lines: CartLine[];
@@ -31,20 +27,21 @@ type StoreContextValue = {
   updateQty: (productId: string, variantId: string, qty: number) => void;
   removeLine: (productId: string, variantId: string) => void;
   clearCart: () => void;
+  replaceCart: (lines: CartLine[]) => void;
   toggleWishlist: (productId: string) => void;
   addRecentlyViewed: (productId: string) => void;
   setShippingMode: (mode: ShippingMode) => void;
   setCouponCode: (code: string) => void;
   saveAddress: (address: Omit<SavedAddress, 'id'>) => void;
   deleteAddress: (id: string) => void;
-  placeOrder: (payload: CheckoutPayload, options?: PlaceOrderOptions) => string;
+  syncOrder: (order: Order) => void;
   getOrderById: (orderId: string) => Order | null;
   reorder: (orderId: string) => void;
 };
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
-const STORAGE_KEY = 'sheesha-store-v2';
+const STORAGE_KEY = 'sheesha-store-v3';
 const VALID_COUPONS: Record<string, number> = {
   LUXE10: 0.1,
   NIGHT15: 0.15,
@@ -127,7 +124,7 @@ function hydrateState(raw: string | null): PersistedState {
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
 
     return {
-      lines: Array.isArray(parsed.lines) ? parsed.lines.map((line) => sanitizeLine(line)).filter(Boolean) as CartLine[] : [],
+      lines: Array.isArray(parsed.lines) ? (parsed.lines.map((line) => sanitizeLine(line)).filter(Boolean) as CartLine[]) : [],
       wishlistIds: Array.isArray(parsed.wishlistIds)
         ? parsed.wishlistIds.filter((id): id is string => typeof id === 'string' && !!findProduct(id))
         : [],
@@ -137,9 +134,9 @@ function hydrateState(raw: string | null): PersistedState {
       shippingMode: parsed.shippingMode === 'express' || parsed.shippingMode === 'pickup' ? parsed.shippingMode : 'standard',
       couponCode: typeof parsed.couponCode === 'string' ? parsed.couponCode.toUpperCase().trim() : '',
       savedAddresses: Array.isArray(parsed.savedAddresses)
-        ? parsed.savedAddresses.map((address) => sanitizeAddress(address)).filter(Boolean) as SavedAddress[]
+        ? (parsed.savedAddresses.map((address) => sanitizeAddress(address)).filter(Boolean) as SavedAddress[])
         : [],
-      orders: Array.isArray(parsed.orders) ? parsed.orders.map((order) => sanitizeOrder(order)).filter(Boolean) as Order[] : [],
+      orders: Array.isArray(parsed.orders) ? (parsed.orders.map((order) => sanitizeOrder(order)).filter(Boolean) as Order[]) : [],
       lastCartTouch: typeof parsed.lastCartTouch === 'number' ? parsed.lastCartTouch : Date.now()
     };
   } catch {
@@ -149,11 +146,8 @@ function hydrateState(raw: string | null): PersistedState {
 
 function track(eventName: string, payload: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
-
   const dataLayer = (window as Window & { dataLayer?: Array<Record<string, unknown>> }).dataLayer;
-  if (Array.isArray(dataLayer)) {
-    dataLayer.push({ event: eventName, ...payload });
-  }
+  if (Array.isArray(dataLayer)) dataLayer.push({ event: eventName, ...payload });
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -194,10 +188,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const discountRate = VALID_COUPONS[state.couponCode] || 0;
     const discount = Math.round(subtotal * discountRate);
-
     const baseShipping = state.shippingMode === 'express' ? 199 : state.shippingMode === 'pickup' ? 0 : 79;
     const shippingFee = state.shippingMode === 'standard' && subtotal >= 3000 ? 0 : baseShipping;
-
     const taxable = Math.max(0, subtotal - discount);
     const tax = Math.round(taxable * 0.05);
     const total = taxable + shippingFee + tax;
@@ -240,6 +232,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
         return { ...prev, lines: nextLines, lastCartTouch: Date.now() };
       });
+
       setDrawerOpen(true);
       track('add_to_cart', { productId, variantId, qty });
     },
@@ -257,6 +250,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const nextLines = prev.lines
           .map((line) => (line.productId === productId && line.variantId === variantId ? { ...line, qty: Math.max(1, Math.min(20, qty)) } : line))
           .filter((line) => line.qty > 0);
+
         return { ...prev, lines: nextLines, lastCartTouch: Date.now() };
       });
     },
@@ -267,7 +261,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         lastCartTouch: Date.now()
       }));
     },
-    clearCart: () => setState((prev) => ({ ...prev, lines: [], lastCartTouch: Date.now() })),
+    clearCart: () => setState((prev) => ({ ...prev, lines: [], couponCode: '', lastCartTouch: Date.now() })),
+    replaceCart: (lines) => {
+      const nextLines = lines.map((line) => sanitizeLine(line)).filter(Boolean) as CartLine[];
+      setState((prev) => ({ ...prev, lines: nextLines, lastCartTouch: Date.now() }));
+    },
     toggleWishlist: (productId) => {
       if (!findProduct(productId)) return;
       setState((prev) => {
@@ -297,73 +295,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     deleteAddress: (id) => {
       setState((prev) => ({ ...prev, savedAddresses: prev.savedAddresses.filter((address) => address.id !== id) }));
     },
-    placeOrder: (payload, options) => {
-      const orderId = `SH${Date.now().toString().slice(-8)}`;
-      const order: Order = {
-        id: orderId,
-        createdAt: new Date().toISOString(),
-        lines: state.lines,
-        subtotal: pricing.subtotal,
-        discount: pricing.discount,
-        shippingFee: pricing.shippingFee,
-        tax: pricing.tax,
-        total: pricing.total,
-        status: 'placed',
-        paymentMethod: payload.paymentMethod,
-        customerName: payload.fullName,
-        phone: payload.phone,
-        email: payload.email,
-        address: payload.address,
-        city: payload.city,
-        pincode: payload.pincode
-      };
-
-      const message = [
-        'New Website Order',
-        `Order ID: ${order.id}`,
-        `Name: ${payload.fullName}`,
-        `Phone: ${payload.phone}`,
-        `Payment: ${payload.paymentMethod}`,
-        `Address: ${payload.address}, ${payload.city}, ${payload.pincode}`,
-        `Amount: Rs ${pricing.total}`
-      ].join('\n');
-
-      window.open(`https://wa.me/917790813469?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    syncOrder: (order) => {
+      const clean = sanitizeOrder(order);
+      if (!clean) return;
 
       setState((prev) => {
-        const nextAddresses = options?.saveAddressLabel
-          ? [
-              {
-                id: `ADDR${Date.now().toString().slice(-7)}`,
-                label: options.saveAddressLabel,
-                fullName: payload.fullName,
-                phone: payload.phone,
-                address: payload.address,
-                city: payload.city,
-                pincode: payload.pincode
-              },
-              ...prev.savedAddresses
-            ].slice(0, 10)
-          : prev.savedAddresses;
-
-        return {
-          ...prev,
-          lines: [],
-          couponCode: '',
-          orders: [order, ...prev.orders].slice(0, 50),
-          savedAddresses: nextAddresses,
-          lastCartTouch: Date.now()
-        };
+        const existingIndex = prev.orders.findIndex((item) => item.id === clean.id);
+        const nextOrders = [...prev.orders];
+        if (existingIndex >= 0) {
+          nextOrders[existingIndex] = clean;
+        } else {
+          nextOrders.unshift(clean);
+        }
+        return { ...prev, orders: nextOrders.slice(0, 80) };
       });
-
-      track('purchase', { orderId, value: pricing.total, paymentMethod: payload.paymentMethod });
-      return orderId;
     },
     getOrderById: (orderId) => state.orders.find((order) => order.id.toLowerCase() === orderId.toLowerCase()) || null,
     reorder: (orderId) => {
       const order = state.orders.find((item) => item.id === orderId);
       if (!order) return;
-      setState((prev) => ({ ...prev, lines: order.lines, lastCartTouch: Date.now() }));
+      setState((prev) => ({ ...prev, lines: order.lines, couponCode: '', lastCartTouch: Date.now() }));
       setDrawerOpen(true);
       track('reorder', { orderId });
     }

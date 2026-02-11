@@ -17,7 +17,8 @@ export const products: Product[] = [
     reviewCount: 126,
     variants: [
       { id: 'brass-std', label: 'Standard Stem', priceDelta: 0, stock: 7 },
-      { id: 'brass-xl', label: 'Extended Stem', priceDelta: 500, stock: 3 }
+      { id: 'brass-xl', label: 'Extended Stem', priceDelta: 500, stock: 3 },
+      { id: 'brass-starter-combo', label: 'Starter Combo (Bowl + Coals)', priceDelta: 890, stock: 5 }
     ],
     trustBadges: ['Authentic Brass', '1-Year Support', 'Secure Checkout'],
     sku: 'SH-BR-101',
@@ -39,7 +40,8 @@ export const products: Product[] = [
     reviewCount: 94,
     variants: [
       { id: 'glass-clear', label: 'Clear', priceDelta: 0, stock: 5 },
-      { id: 'glass-smoke', label: 'Smoke Tint', priceDelta: 350, stock: 4 }
+      { id: 'glass-smoke', label: 'Smoke Tint', priceDelta: 350, stock: 4 },
+      { id: 'glass-premium-combo', label: 'Premium Combo (Heat Manager + Coals)', priceDelta: 1190, stock: 4 }
     ],
     trustBadges: ['Heat-Resistant Glass', '1-Year Support', 'Free Delivery over Rs 3000'],
     sku: 'SH-GL-201',
@@ -61,7 +63,8 @@ export const products: Product[] = [
     reviewCount: 81,
     variants: [
       { id: 'mini-black', label: 'Matte Black', priceDelta: 0, stock: 12 },
-      { id: 'mini-sand', label: 'Sand Gold', priceDelta: 180, stock: 6 }
+      { id: 'mini-sand', label: 'Sand Gold', priceDelta: 180, stock: 6 },
+      { id: 'mini-travel-combo', label: 'Travel Combo (Case + Coal Pouch)', priceDelta: 490, stock: 8 }
     ],
     trustBadges: ['Carry Case Included', 'Low Maintenance', '7-Day Easy Replacement'],
     sku: 'SH-MN-301',
@@ -83,7 +86,8 @@ export const products: Product[] = [
     reviewCount: 204,
     variants: [
       { id: 'flavor-50g', label: '50g Pack', priceDelta: 0, stock: 30 },
-      { id: 'flavor-100g', label: '100g Pack', priceDelta: 420, stock: 20 }
+      { id: 'flavor-100g', label: '100g Pack', priceDelta: 420, stock: 20 },
+      { id: 'flavor-double-apple-combo', label: 'Combo Pack (Double Apple + Mint)', priceDelta: 560, stock: 14 }
     ],
     trustBadges: ['Fresh Batch', 'Sealed Pack', 'Authentic Blend'],
     sku: 'SH-FL-401',
@@ -105,7 +109,8 @@ export const products: Product[] = [
     reviewCount: 172,
     variants: [
       { id: 'mint-50g', label: '50g Pack', priceDelta: 0, stock: 24 },
-      { id: 'mint-100g', label: '100g Pack', priceDelta: 420, stock: 16 }
+      { id: 'mint-100g', label: '100g Pack', priceDelta: 420, stock: 16 },
+      { id: 'mint-fusion-combo', label: 'Combo Pack (Mint + Citrus)', priceDelta: 560, stock: 12 }
     ],
     trustBadges: ['Fresh Batch', 'Sealed Pack', 'Authentic Blend'],
     sku: 'SH-FL-402',
@@ -126,7 +131,8 @@ export const products: Product[] = [
     reviewCount: 133,
     variants: [
       { id: 'grape-50g', label: '50g Pack', priceDelta: 0, stock: 18 },
-      { id: 'grape-100g', label: '100g Pack', priceDelta: 420, stock: 12 }
+      { id: 'grape-100g', label: '100g Pack', priceDelta: 420, stock: 12 },
+      { id: 'grape-party-combo', label: 'Party Combo (Grape + Wild Berry)', priceDelta: 560, stock: 10 }
     ],
     trustBadges: ['Fresh Batch', 'Sealed Pack', 'Authentic Blend'],
     sku: 'SH-FL-403',

@@ -81,8 +81,9 @@ export function SiteFooter() {
             <Link href="/contact" className="hover:text-white">Contact & Visit</Link>
             <a href="https://share.google/YnWp1UfxyE2ImFTRb" target="_blank" rel="noopener noreferrer" className="hover:text-white">Google Maps</a>
             <Link href="/policies/shipping" className="hover:text-white">Shipping Policy</Link>
-            <Link href="/policies/returns" className="hover:text-white">Returns Policy</Link>
+            <Link href="/policies/returns" className="hover:text-white">Return &amp; Refund Policy</Link>
             <Link href="/policies/privacy" className="hover:text-white">Privacy Policy</Link>
+            <Link href="/policies/terms" className="hover:text-white">Terms &amp; Conditions</Link>
           </div>
         </div>
       </div>

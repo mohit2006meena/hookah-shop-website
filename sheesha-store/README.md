@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SHEESHA HOOKAH Ecommerce (Next.js)
 
-## Getting Started
+Production-oriented ecommerce app for hookahs, flavors, and accessories with:
 
-First, run the development server:
+- Mobile-first storefront + predictive search + smart filtering
+- Variant-based cart and one-page checkout
+- UPI-only checkout flow
+- Stock reservation and inventory APIs
+- Age-gate + tobacco disclaimer compliance
+- Order tracking, wishlist, saved addresses, and policy pages
+- Admin dashboard APIs for inventory and order metrics
+
+## 1) Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 2) Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- No environment variables are required.
+- UPI intent checkout uses a fixed UPI ID inside `src/components/checkout/checkout-client.tsx`.
+- Update `STORE_UPI_ID` and `STORE_UPI_NAME` in that file for your payment destination.
 
-## Learn More
+## 3) Age verification
 
-To learn more about Next.js, take a look at the following resources:
+- Middleware redirects all users to `/age-check` until they confirm 18+.
+- Cookie `age_verified=yes` is issued by `/api/age/verify`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 4) Commerce APIs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `POST /api/commerce/orders`
+  - Creates order, validates stock, reserves inventory.
+  - Returns order details for UPI intent payment.
+- `POST /api/commerce/orders/verify`
+  - Kept for compatibility; currently disabled in UPI-only mode.
+- `GET /api/commerce/orders/:orderId`
+  - Fetches a single order for tracking.
+- `GET /api/commerce/orders?orderId=...|email=...|phone=...`
+  - Fetches matching orders.
+- `POST /api/commerce/abandoned-carts`
+  - Captures recoverable abandoned cart records.
+- `GET /api/commerce/admin/dashboard`
+- `GET /api/commerce/admin/inventory`
+- `PATCH /api/commerce/admin/inventory`
 
-## Deploy on Vercel
+## 5) Data storage
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Store data is persisted to `data/commerce.json` on the server runtime.
+- For horizontally scaled hosting, migrate this to a real database before launch.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 6) Build and lint
+
+```bash
+npm run lint
+npm run build
+```
+
+## 7) Go-live checklist
+
+- Configure HTTPS + domain.
+- Update the UPI ID constant in checkout client.
+- Replace any placeholder contact/address data.
+- Verify policy pages against legal requirements for your business.

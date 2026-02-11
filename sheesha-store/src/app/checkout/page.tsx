@@ -3,7 +3,7 @@ import { CheckoutClient } from '@/components/checkout/checkout-client';
 
 export const metadata: Metadata = {
   title: 'Checkout',
-  description: 'Complete your order with one-page mobile checkout.'
+  description: 'Complete your order with one-page mobile checkout and UPI payments.'
 };
 
 export default function CheckoutPage() {

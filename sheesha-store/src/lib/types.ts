@@ -43,7 +43,7 @@ export type CartLine = {
 
 export type ShippingMode = 'standard' | 'express' | 'pickup';
 
-export type PaymentMethod = 'UPI' | 'Card' | 'COD';
+export type PaymentMethod = 'UPI';
 
 export type CheckoutPayload = {
   fullName: string;
@@ -65,7 +65,14 @@ export type SavedAddress = {
   pincode: string;
 };
 
-export type OrderStatus = 'placed' | 'confirmed' | 'shipped' | 'delivered';
+export type OrderStatus =
+  | 'placed'
+  | 'awaiting_payment'
+  | 'confirmed'
+  | 'shipped'
+  | 'delivered'
+  | 'payment_expired'
+  | 'cancelled';
 
 export type Order = {
   id: string;
@@ -84,4 +91,8 @@ export type Order = {
   address: string;
   city: string;
   pincode: string;
+  gatewayOrderId?: string;
+  gatewayPaymentId?: string;
+  paidAt?: string;
+  reservationExpiresAt?: string;
 };

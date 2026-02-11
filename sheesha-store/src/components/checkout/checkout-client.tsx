@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { products } from '@/lib/catalog';
 import { useStore } from '@/components/providers/store-provider';
 import { formatINR, getVariant, linePrice } from '@/lib/utils';
-import type { CheckoutPayload, PaymentMethod, ShippingMode } from '@/lib/types';
+import type { CheckoutPayload, Order, ShippingMode } from '@/lib/types';
 
-const paymentMethods: PaymentMethod[] = ['UPI', 'Card', 'COD'];
+type OrderCreateResponse =
+  | { ok: true; order: Order; payment: null }
+  | { ok: false; code: string; message: string };
+
 const shippingModes: Array<{ value: ShippingMode; label: string; hint: string }> = [
   { value: 'standard', label: 'Standard', hint: '2-4 days' },
   { value: 'express', label: 'Express', hint: '1-2 days' },
@@ -24,6 +27,22 @@ const emptyForm: CheckoutPayload = {
   paymentMethod: 'UPI'
 };
 
+const STORE_UPI_ID = 'sheeshahookahshop@upi';
+const STORE_UPI_NAME = 'SHEESHA HOOKAH';
+
+function openUpiIntent(order: Order) {
+  const params = new URLSearchParams({
+    pa: STORE_UPI_ID,
+    pn: STORE_UPI_NAME,
+    am: String(order.total),
+    cu: 'INR',
+    tn: `Order ${order.id}`
+  });
+
+  const url = `upi://pay?${params.toString()}`;
+  window.location.href = url;
+}
+
 export function CheckoutClient() {
   const {
     lines,
@@ -37,12 +56,17 @@ export function CheckoutClient() {
     couponCode,
     setCouponCode,
     savedAddresses,
-    placeOrder
+    syncOrder,
+    clearCart,
+    saveAddress
   } = useStore();
+
   const [form, setForm] = useState<CheckoutPayload>(emptyForm);
-  const [saveAddress, setSaveAddress] = useState(true);
+  const [saveAddressEnabled, setSaveAddressEnabled] = useState(true);
   const [addressLabel, setAddressLabel] = useState('Home');
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const lineItems = useMemo(() => {
     return lines
@@ -61,6 +85,53 @@ export function CheckoutClient() {
       .filter(Boolean);
   }, [lines]);
 
+  useEffect(() => {
+    if (!lines.length) return;
+    if (!form.email.trim() && !form.phone.trim()) return;
+
+    const timer = window.setTimeout(() => {
+      void fetch('/api/commerce/abandoned-carts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: form.fullName,
+          email: form.email,
+          phone: form.phone,
+          lines,
+          shippingMode,
+          couponCode,
+          total
+        })
+      });
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [couponCode, form.email, form.fullName, form.phone, lines, shippingMode, total]);
+
+  useEffect(() => {
+    if (!lines.length) return;
+
+    const payload = JSON.stringify({
+      fullName: form.fullName,
+      email: form.email,
+      phone: form.phone,
+      lines,
+      shippingMode,
+      couponCode,
+      total
+    });
+
+    const onBeforeUnload = () => {
+      if (!form.email.trim() && !form.phone.trim()) return;
+      if (!navigator.sendBeacon) return;
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon('/api/commerce/abandoned-carts', blob);
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [couponCode, form.email, form.fullName, form.phone, lines, shippingMode, total]);
+
   function applySavedAddress(addressId: string) {
     const selected = savedAddresses.find((item) => item.id === addressId);
     if (!selected) return;
@@ -74,12 +145,58 @@ export function CheckoutClient() {
     }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleOrderSuccess(order: Order) {
+    syncOrder(order);
+    if (saveAddressEnabled) {
+      saveAddress({
+        label: addressLabel || 'Saved Address',
+        fullName: form.fullName,
+        phone: form.phone,
+        address: form.address,
+        city: form.city,
+        pincode: form.pincode
+      });
+    }
+    clearCart();
+    setOrderId(order.id);
+    setErrorMessage('');
+    openUpiIntent(order);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (lines.length === 0) return;
 
-    const id = placeOrder(form, saveAddress ? { saveAddressLabel: addressLabel } : undefined);
-    setOrderId(id);
+    setIsSubmitting(true);
+    setErrorMessage('');
+    setOrderId(null);
+
+    try {
+      const response = await fetch('/api/commerce/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lines,
+          shippingMode,
+          couponCode,
+          customer: {
+            ...form,
+            paymentMethod: 'UPI'
+          }
+        })
+      });
+
+      const data = (await response.json()) as OrderCreateResponse;
+      if (!response.ok || !data.ok) {
+        throw new Error(data.ok ? 'Unable to place order.' : data.message);
+      }
+
+      handleOrderSuccess(data.order);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Order could not be placed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (lines.length === 0) {
@@ -102,17 +219,21 @@ export function CheckoutClient() {
       <section className="lux-card p-4 sm:p-6">
         <p className="text-xs uppercase tracking-[0.14em] text-[#1bb8a0]">Guest checkout</p>
         <h1 className="mt-2 text-3xl text-white">One-page Checkout</h1>
-        <p className="mt-1 text-sm text-white/70">Autofill-enabled fields for faster mobile completion.</p>
+        <p className="mt-1 text-sm text-white/70">Autofill-enabled fields with UPI-only checkout for faster completion.</p>
 
         {orderId ? (
           <div className="mt-5 rounded-2xl border border-[#1bb8a0]/40 bg-[#1bb8a0]/10 p-4">
             <p className="text-sm text-white">Order placed successfully.</p>
             <p className="mt-1 text-xl font-semibold text-[#8cf0dd]">Order ID: {orderId}</p>
-            <p className="mt-1 text-sm text-white/70">A WhatsApp confirmation has been opened for instant processing.</p>
+            <p className="mt-1 text-sm text-white/70">UPI payment has been initiated on your device.</p>
             <Link href={`/track-order?orderId=${orderId}`} className="mt-4 inline-flex rounded-full border border-white/20 px-4 py-2 text-sm text-white">
               Track this order
             </Link>
           </div>
+        ) : null}
+
+        {errorMessage ? (
+          <div className="mt-4 rounded-2xl border border-[#f2a5a5]/35 bg-[#f2a5a5]/10 p-3 text-sm text-[#ffd6d6]">{errorMessage}</div>
         ) : null}
 
         <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
@@ -156,7 +277,7 @@ export function CheckoutClient() {
             </label>
           </div>
 
-          <label className="space-y-1 block">
+          <label className="block space-y-1">
             <span className="text-xs uppercase tracking-[0.14em] text-white/55">Email</span>
             <input
               required
@@ -168,7 +289,7 @@ export function CheckoutClient() {
             />
           </label>
 
-          <label className="space-y-1 block">
+          <label className="block space-y-1">
             <span className="text-xs uppercase tracking-[0.14em] text-white/55">Address</span>
             <input
               required
@@ -205,19 +326,13 @@ export function CheckoutClient() {
 
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.14em] text-white/55">Payment method</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {paymentMethods.map((method) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, paymentMethod: method }))}
-                  className={`h-10 rounded-xl border text-sm ${
-                    form.paymentMethod === method ? 'border-[#c9a24f] bg-[#c9a24f]/12 text-white' : 'border-white/15 bg-black/20 text-white/75'
-                  }`}
-                >
-                  {method}
-                </button>
-              ))}
+            <div className="rounded-2xl border border-[#c9a24f]/35 bg-[#c9a24f]/10 p-3 text-sm text-white">
+              UPI only
+            </div>
+            <div className="grid gap-2 rounded-2xl border border-white/10 bg-black/25 p-3 text-xs text-white/70 sm:grid-cols-3">
+              <span>Secure UPI payments</span>
+              <span>UPI-only checkout</span>
+              <span>SSL encrypted checkout</span>
             </div>
           </div>
 
@@ -225,14 +340,14 @@ export function CheckoutClient() {
             <label className="flex items-center gap-2 text-sm text-white/85">
               <input
                 type="checkbox"
-                checked={saveAddress}
-                onChange={(event) => setSaveAddress(event.target.checked)}
+                checked={saveAddressEnabled}
+                onChange={(event) => setSaveAddressEnabled(event.target.checked)}
                 className="h-4 w-4"
               />
               Save this address for faster reorders
             </label>
 
-            {saveAddress ? (
+            {saveAddressEnabled ? (
               <input
                 value={addressLabel}
                 onChange={(event) => setAddressLabel(event.target.value)}
@@ -244,9 +359,10 @@ export function CheckoutClient() {
 
           <button
             type="submit"
-            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#c9a24f] to-[#1bb8a0] text-sm font-semibold text-black"
+            disabled={isSubmitting}
+            className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#c9a24f] to-[#1bb8a0] text-sm font-semibold text-black disabled:opacity-60"
           >
-            Place Order ({formatINR(total)})
+            {isSubmitting ? 'Processing...' : `Place Order (${formatINR(total)})`}
           </button>
         </form>
       </section>
@@ -260,7 +376,9 @@ export function CheckoutClient() {
                 <div key={line.key} className="flex items-start justify-between gap-3 text-sm">
                   <div>
                     <p className="text-white">{line.name}</p>
-                    <p className="text-white/55">{line.variant} x {line.qty}</p>
+                    <p className="text-white/55">
+                      {line.variant} x {line.qty}
+                    </p>
                   </div>
                   <p className="text-white/80">{formatINR(line.amount)}</p>
                 </div>
