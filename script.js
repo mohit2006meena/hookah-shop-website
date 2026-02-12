@@ -1,5 +1,58 @@
 /* Global motion + UI */
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ageGate = document.getElementById('ageGate');
+const ageGateYes = document.getElementById('ageGateYes');
+const ageGateNo = document.getElementById('ageGateNo');
+const ageGateMessage = document.getElementById('ageGateMessage');
+
+function initAgeGate() {
+  if (!ageGate) return;
+
+  const path = window.location.pathname.toLowerCase();
+  const isHome = path === '/' || path.endsWith('/index.html') || path === '/index';
+  if (!isHome) {
+    ageGate.classList.add('hidden');
+    ageGate.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  document.body.classList.add('age-gate-open');
+  ageGate.setAttribute('aria-hidden', 'false');
+
+  if (ageGateYes) {
+    ageGateYes.focus();
+    ageGateYes.addEventListener('click', () => {
+      ageGate.classList.add('hidden');
+      ageGate.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('age-gate-open');
+    });
+  }
+
+  if (ageGateNo) {
+    ageGateNo.addEventListener('click', () => {
+      ageGate.classList.add('blocked');
+      if (ageGateYes) ageGateYes.disabled = true;
+      if (ageGateNo) {
+        ageGateNo.disabled = true;
+        ageGateNo.textContent = 'Access blocked for under 18';
+      }
+      if (ageGateMessage) {
+        ageGateMessage.textContent = 'Access denied. This website is strictly for 18+ visitors.';
+      }
+    });
+  }
+}
+document.addEventListener('DOMContentLoaded', initAgeGate);
+
+function initAdminEntryTrigger() {
+  const trigger = document.getElementById('adminSecretTrigger');
+  if (!trigger) return;
+
+  trigger.addEventListener('click', () => {
+    window.location.href = 'admin.html';
+  });
+}
+document.addEventListener('DOMContentLoaded', initAdminEntryTrigger);
 
 /* Nav toggle */
 const nav = document.getElementById('navLinks');
@@ -413,7 +466,8 @@ if (featuredTrack) {
 
 /* Products + ecommerce catalog */
 const productGrid = document.getElementById('productGrid');
-const products = [
+const productsStorageKey = 'sheesha_products_v1';
+const defaultProducts = [
   {
     id: 'classic-brass-hookah',
     name: 'Classic Brass Hookah',
@@ -495,6 +549,56 @@ const products = [
     rating: 4.8
   }
 ];
+
+function makeProductId(value, fallbackIndex = 0) {
+  const token = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  if (token) return token;
+  return `product-${fallbackIndex + 1}`;
+}
+
+function sanitizeProductInput(product, index = 0) {
+  const allowedTypes = new Set(['traditional', 'glass', 'flavors', 'accessories']);
+  const name = String(product && product.name ? product.name : '').trim() || `Product ${index + 1}`;
+  const typeToken = String(product && product.type ? product.type : '').trim().toLowerCase();
+  const type = allowedTypes.has(typeToken) ? typeToken : 'traditional';
+  const priceRaw = Number(product && product.price);
+  const price = Number.isFinite(priceRaw) ? Math.max(0, Math.round(priceRaw)) : 0;
+  const ratingRaw = Number(product && product.rating);
+  const rating = Number.isFinite(ratingRaw) ? Math.max(1, Math.min(5, ratingRaw)) : 4.6;
+  const idSource = product && product.id ? product.id : name;
+  const id = makeProductId(idSource, index);
+
+  return {
+    id,
+    name,
+    type,
+    price,
+    badge: String(product && product.badge ? product.badge : 'Featured').trim() || 'Featured',
+    note: String(product && product.note ? product.note : 'Premium quality selection').trim() || 'Premium quality selection',
+    image: String(product && product.image ? product.image : 'assets/gallery/premium-glass-hookah.jpg').trim() || 'assets/gallery/premium-glass-hookah.jpg',
+    rating
+  };
+}
+
+function loadProductsCatalog() {
+  const fallback = defaultProducts.map((item, index) => sanitizeProductInput(item, index));
+
+  try {
+    const raw = window.localStorage.getItem(productsStorageKey);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.length) return fallback;
+    return parsed.map((item, index) => sanitizeProductInput(item, index));
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+const products = loadProductsCatalog();
 
 const shopFlavorCatalogHost = document.getElementById('shopFlavorCatalog');
 const rawFlavors = Array.isArray(window.flavors) ? window.flavors : [];
@@ -611,7 +715,6 @@ function renderShopFlavorCatalog() {
 const catalogById = new Map();
 const catalogByName = new Map();
 const cartStorageKey = 'sheesha_cart_v3';
-const couponRates = { LUXE10: 0.1, NIGHT15: 0.15 };
 const shippingRates = { standard: 79, express: 199, pickup: 0 };
 let cartState = loadCartState();
 
@@ -832,11 +935,6 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  if (target.id === 'applyCouponBtn') {
-    applyCoupon();
-    return;
-  }
-
   if (target.id === 'clearCartBtn') {
     clearCart();
   }
@@ -936,7 +1034,7 @@ if (lightbox) {
 
 /* Ecommerce cart */
 function loadCartState() {
-  const fallback = { items: [], coupon: '', shipping: 'standard' };
+  const fallback = { items: [], shipping: 'standard' };
 
   try {
     const raw = localStorage.getItem(cartStorageKey);
@@ -945,9 +1043,8 @@ function loadCartState() {
     const parsed = JSON.parse(raw);
     const items = Array.isArray(parsed.items) ? parsed.items.filter(Boolean) : [];
     const shipping = Object.prototype.hasOwnProperty.call(shippingRates, parsed.shipping) ? parsed.shipping : 'standard';
-    const coupon = typeof parsed.coupon === 'string' ? parsed.coupon.toUpperCase().trim() : '';
 
-    return { items, coupon, shipping };
+    return { items, shipping };
   } catch (_error) {
     return fallback;
   }
@@ -982,20 +1079,17 @@ function sanitizeCartItem(item) {
 function normalizeCartState() {
   cartState.items = cartState.items.map(sanitizeCartItem).filter(Boolean);
   if (!Object.prototype.hasOwnProperty.call(shippingRates, cartState.shipping)) cartState.shipping = 'standard';
-  if (!Object.prototype.hasOwnProperty.call(couponRates, cartState.coupon)) cartState.coupon = '';
 }
 
 function computeTotals() {
   const subtotal = cartState.items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const discountRate = couponRates[cartState.coupon] || 0;
-  const discount = Math.round(subtotal * discountRate);
   const shippingBase = shippingRates[cartState.shipping] || shippingRates.standard;
   const shipping = cartState.shipping === 'standard' && subtotal >= 3000 ? 0 : shippingBase;
-  const taxable = Math.max(0, subtotal - discount);
+  const taxable = Math.max(0, subtotal);
   const tax = Math.round(taxable * 0.05);
   const total = taxable + shipping + tax;
 
-  return { subtotal, discount, shipping, tax, total };
+  return { subtotal, shipping, tax, total };
 }
 
 let cartToastTimer = 0;
@@ -1058,11 +1152,6 @@ function mountCartShell() {
           <div class="cart-items" id="cartItems"></div>
         </div>
         <div class="cart-footer">
-          <div class="coupon-row">
-            <input class="form-input cart-input" id="couponInput" type="text" placeholder="Coupon code (LUXE10)" />
-            <button class="chip" type="button" id="applyCouponBtn">Apply</button>
-          </div>
-          <p class="coupon-status subtle" id="couponStatus">Use code LUXE10 for 10% off.</p>
           <div class="shipping-row">
             <label for="shippingSelect" class="subtle">Shipping</label>
             <select class="chip select shipping-select" id="shippingSelect" aria-label="Select shipping">
@@ -1073,7 +1162,6 @@ function mountCartShell() {
           </div>
           <div class="summary-grid">
             <div class="summary-row"><span>Subtotal</span><strong id="sumSubtotal">Rs 0</strong></div>
-            <div class="summary-row"><span>Discount</span><strong id="sumDiscount">- Rs 0</strong></div>
             <div class="summary-row"><span>Shipping</span><strong id="sumShipping">Rs 0</strong></div>
             <div class="summary-row"><span>Tax (5%)</span><strong id="sumTax">Rs 0</strong></div>
             <div class="summary-row total"><span>Total</span><strong id="sumTotal">Rs 0</strong></div>
@@ -1108,16 +1196,10 @@ function renderCart() {
 
   const cartItemsEl = document.getElementById('cartItems');
   const cartEmptyEl = document.getElementById('cartEmpty');
-  const couponInput = document.getElementById('couponInput');
-  const couponStatus = document.getElementById('couponStatus');
   const shippingSelect = document.getElementById('shippingSelect');
   if (!cartItemsEl || !cartEmptyEl) return;
 
   if (shippingSelect) shippingSelect.value = cartState.shipping;
-  if (couponInput && cartState.coupon) couponInput.value = cartState.coupon;
-  if (couponStatus) {
-    couponStatus.textContent = cartState.coupon ? `${cartState.coupon} applied.` : 'Use code LUXE10 for 10% off.';
-  }
 
   const count = cartState.items.reduce((sum, item) => sum + item.qty, 0);
   document.querySelectorAll('.cart-count').forEach((node) => {
@@ -1151,13 +1233,11 @@ function renderCart() {
 
   const totals = computeTotals();
   const sumSubtotal = document.getElementById('sumSubtotal');
-  const sumDiscount = document.getElementById('sumDiscount');
   const sumShipping = document.getElementById('sumShipping');
   const sumTax = document.getElementById('sumTax');
   const sumTotal = document.getElementById('sumTotal');
 
   if (sumSubtotal) sumSubtotal.textContent = formatCurrency(totals.subtotal);
-  if (sumDiscount) sumDiscount.textContent = `- ${formatCurrency(totals.discount)}`;
   if (sumShipping) sumShipping.textContent = formatCurrency(totals.shipping);
   if (sumTax) sumTax.textContent = formatCurrency(totals.tax);
   if (sumTotal) sumTotal.textContent = formatCurrency(totals.total);
@@ -1241,30 +1321,6 @@ function clearCart() {
   showCartToast('Cart cleared');
 }
 
-function applyCoupon() {
-  const input = document.getElementById('couponInput');
-  if (!input) return;
-
-  const code = String(input.value || '').trim().toUpperCase();
-  if (!code) {
-    cartState.coupon = '';
-    saveCartState();
-    renderCart();
-    showCartToast('Coupon removed');
-    return;
-  }
-
-  if (!Object.prototype.hasOwnProperty.call(couponRates, code)) {
-    showCartToast('Invalid coupon code');
-    return;
-  }
-
-  cartState.coupon = code;
-  saveCartState();
-  renderCart();
-  showCartToast(`Coupon ${code} applied`);
-}
-
 function checkoutOrder(form) {
   if (!cartState.items.length) {
     showCartToast('Your cart is empty');
@@ -1306,7 +1362,6 @@ function checkoutOrder(form) {
     itemsText,
     '',
     `Subtotal: ${formatCurrency(totals.subtotal)}`,
-    `Discount: -${formatCurrency(totals.discount)}`,
     `Shipping: ${formatCurrency(totals.shipping)}`,
     `Tax (5%): ${formatCurrency(totals.tax)}`,
     `Total: ${formatCurrency(totals.total)}`

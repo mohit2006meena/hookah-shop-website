@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | SHEESHA HOOKAH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Clash+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar" id="navbar">
+    <a href="index.html" class="logo">SHEESHA HOOKAH</a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="products.html" class="nav-link">Collection</a>
+      <a href="gallery.html" class="nav-link">Gallery</a>
+      <a href="contact.html" class="nav-link">Contact</a>
+    </div>
+    <button class="mobile-toggle" id="navToggle" aria-label="Toggle navigation">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <div class="nav-overlay" id="navOverlay"></div>
+
+  <main class="admin-shell">
+    <div class="container admin-layout">
+      <section class="glass-panel admin-panel" id="adminLoginPanel">
+        <p class="eyebrow">Admin Access</p>
+        <h2>Product Control Panel</h2>
+        <p class="subtle">Sign in to add, edit, and remove products from the live website catalog.</p>
+        <form class="admin-login-form" id="adminLoginForm">
+          <input class="form-input" id="adminIdInput" type="text" placeholder="Admin ID" autocomplete="username" required />
+          <input class="form-input" id="adminPasswordInput" type="password" placeholder="Password" autocomplete="current-password" required />
+          <button class="btn btn-primary" type="submit">Unlock Admin</button>
+        </form>
+        <p class="admin-auth-msg subtle" id="adminAuthMessage"></p>
+      </section>
+
+      <section class="admin-dashboard hidden" id="adminDashboard">
+        <div class="glass-panel admin-panel">
+          <div class="admin-toolbar">
+            <div>
+              <p class="eyebrow">Dashboard</p>
+              <h3>Manage Store Products</h3>
+            </div>
+            <div class="admin-product-actions">
+              <a class="chip" href="products.html">View Storefront</a>
+              <button class="chip" id="adminLogoutBtn" type="button">Logout</button>
+            </div>
+          </div>
+
+          <form class="admin-product-form" id="adminProductForm">
+            <input id="adminEditId" type="hidden" />
+            <input class="form-input" id="adminNameInput" type="text" placeholder="Product name" required />
+            <div class="checkout-grid">
+              <select class="form-input" id="adminTypeInput" required>
+                <option value="traditional">Traditional</option>
+                <option value="glass">Glass</option>
+                <option value="flavors">Flavors</option>
+                <option value="accessories">Accessories</option>
+              </select>
+              <input class="form-input" id="adminPriceInput" type="number" min="0" step="1" placeholder="Price (Rs)" required />
+            </div>
+            <input class="form-input" id="adminBadgeInput" type="text" placeholder="Badge (New, Limited, Staff Pick)" />
+            <textarea class="form-input" id="adminNoteInput" rows="2" placeholder="Short product note"></textarea>
+            <input class="form-input" id="adminImageInput" type="text" placeholder="Image path (example: assets/gallery/shop-front.jpg)" required />
+            <input class="form-input" id="adminRatingInput" type="number" min="1" max="5" step="0.1" placeholder="Rating (1 to 5)" required />
+            <div class="admin-product-actions">
+              <button class="btn btn-primary" id="adminSaveBtn" type="submit">Save Product</button>
+              <button class="btn btn-ghost" id="adminResetBtn" type="button">Reset Form</button>
+            </div>
+          </form>
+          <p class="admin-auth-msg subtle" id="adminStatusMessage"></p>
+        </div>
+
+        <div class="glass-panel admin-panel">
+          <h3>Current Products</h3>
+          <p class="subtle">These entries drive the product cards on your main website.</p>
+          <div class="admin-list" id="adminProductList" aria-live="polite"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="admin.js" defer></script>
+</body>
+</html>

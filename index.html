@@ -28,6 +28,19 @@ Open: http://localhost:5500/index.html
 <body>
   <div class="progress-bar" id="progressBar"></div>
 
+  <section class="age-gate" id="ageGate" role="dialog" aria-modal="true" aria-labelledby="ageGateTitle" aria-describedby="ageGateMessage">
+    <div class="age-gate-card glass-panel">
+      <p class="eyebrow">Age Verification</p>
+      <h2 id="ageGateTitle">Are you 18 or older?</h2>
+      <p class="subtle" id="ageGateMessage">This website contains tobacco-related content. You must be 18+ to enter.</p>
+      <div class="age-gate-actions">
+        <button class="btn btn-primary" id="ageGateYes" type="button">Yes, I am 18+</button>
+        <button class="btn btn-ghost" id="ageGateNo" type="button">No, I am under 18</button>
+      </div>
+      <p class="subtle age-gate-note">Tobacco consumption is injurious to health.</p>
+    </div>
+  </section>
+
   <nav class="navbar" id="navbar">
     <a href="index.html" class="logo">SHEESHA HOOKAH</a>
     <div class="nav-links" id="navLinks">
@@ -53,7 +66,16 @@ Open: http://localhost:5500/index.html
       </div>
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Jaipur · Since 2015</p>
+          <p class="eyebrow hero-admin-line">
+            Jaipur · Since 2020
+            <button
+              class="admin-secret-trigger"
+              id="adminSecretTrigger"
+              type="button"
+              aria-label="Open admin access"
+              title="Admin access"
+            ></button>
+          </p>
           <h1>Redefine Your <span class="highlight">Hookah Ritual</span></h1>
           <p class="lede">Velvet ambience, brass detailing, curated flavors, and precision prep for the smoothest pull every time.</p>
           <div class="cta-row">
@@ -61,8 +83,8 @@ Open: http://localhost:5500/index.html
             <a class="btn btn-ghost" href="https://wa.me/917790813469" target="_blank">Chat on WhatsApp</a>
           </div>
           <div class="stat-bar">
-            <div class="stat"><span>9+</span><small>Years serving</small></div>
-            <div class="stat"><span>120</span><small>Flavors stocked</small></div>
+            <div class="stat"><span>5+</span><small>Years serving</small></div>
+            <div class="stat"><span>25+</span><small>Flavors stocked</small></div>
           </div>
         </div>
         <div class="hero-card glass-panel floating">
