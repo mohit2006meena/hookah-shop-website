@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Cormorant_Garamond, Manrope } from 'next/font/google';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { CartDrawer } from '@/components/cart/cart-drawer';
 import { FloatingActions } from '@/components/common/floating-actions';
 import { MobileBottomBar } from '@/components/layout/mobile-bottom-bar';
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <FloatingActions />
           <MobileBottomBar />
         </StoreProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
