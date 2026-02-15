@@ -50,40 +50,165 @@
               <button class="chip" id="adminLogoutBtn" type="button">Logout</button>
             </div>
           </div>
-
-          <form class="admin-product-form" id="adminProductForm">
-            <input id="adminEditId" type="hidden" />
-            <input class="form-input" id="adminNameInput" type="text" placeholder="Product name" required />
+          <section class="admin-github">
+            <p class="eyebrow">GitHub Publish</p>
+            <p class="subtle">Push catalog + uploaded images directly to your connected GitHub repo.</p>
+            <label class="admin-github-toggle subtle" for="adminGithubPublish">
+              <input id="adminGithubPublish" type="checkbox" />
+              Auto-publish to GitHub when saving or deleting products
+            </label>
             <div class="checkout-grid">
-              <select class="form-input" id="adminTypeInput" required>
-                <option value="traditional">Traditional</option>
-                <option value="glass">Glass</option>
-                <option value="flavors">Flavors</option>
-                <option value="accessories">Accessories</option>
-              </select>
-              <input class="form-input" id="adminPriceInput" type="number" min="0" step="1" placeholder="Price (Rs)" required />
+              <input class="form-input" id="adminGithubOwner" type="text" placeholder="GitHub owner (connected)" />
+              <input class="form-input" id="adminGithubRepo" type="text" placeholder="Repository name (connected)" />
             </div>
-            <input class="form-input" id="adminBadgeInput" type="text" placeholder="Badge (New, Limited, Staff Pick)" />
-            <textarea class="form-input" id="adminNoteInput" rows="2" placeholder="Short product note"></textarea>
-            <input class="form-input" id="adminImageInput" type="text" placeholder="Image path (example: assets/gallery/shop-front.jpg)" required />
-            <input class="form-input" id="adminRatingInput" type="number" min="1" max="5" step="0.1" placeholder="Rating (1 to 5)" required />
-            <div class="admin-product-actions">
-              <button class="btn btn-primary" id="adminSaveBtn" type="submit">Save Product</button>
-              <button class="btn btn-ghost" id="adminResetBtn" type="button">Reset Form</button>
+            <div class="checkout-grid">
+              <input class="form-input" id="adminGithubBranch" type="text" placeholder="Branch (connected)" />
+              <input class="form-input" id="adminGithubToken" type="password" placeholder="GitHub token (Contents write access)" autocomplete="off" />
             </div>
-          </form>
+            <p class="admin-upload-msg subtle" id="adminGithubMessage"></p>
+          </section>
+
+          <div class="admin-edit-state" id="adminEditState" aria-live="polite">
+            <strong id="adminEditStateTitle">New Product Mode</strong>
+            <p class="subtle" id="adminEditStateDesc">Create a product, crop images, and click save when ready.</p>
+          </div>
+
+          <div class="admin-workspace">
+            <form class="admin-product-form" id="adminProductForm">
+              <input id="adminEditId" type="hidden" />
+              <input class="form-input" id="adminNameInput" type="text" placeholder="Product name" required />
+              <div class="checkout-grid">
+                <select class="form-input" id="adminTypeInput" required>
+                  <option value="traditional">Traditional</option>
+                  <option value="glass">Glass</option>
+                  <option value="flavors">Flavors</option>
+                  <option value="accessories">Accessories</option>
+                </select>
+                <input class="form-input" id="adminPriceInput" type="number" min="0" step="1" placeholder="Price (Rs)" required />
+              </div>
+              <input class="form-input" id="adminBadgeInput" type="text" placeholder="Badge (New, Limited, Staff Pick)" />
+              <textarea class="form-input" id="adminNoteInput" rows="2" placeholder="Short product note"></textarea>
+
+              <section class="admin-image-manager">
+                <div class="admin-image-manager-head">
+                  <p class="subtle">Image order defines primary image and storefront gallery.</p>
+                  <button class="chip" id="adminImageRefreshBtn" type="button">Refresh</button>
+                </div>
+                <div class="admin-image-list" id="adminImageList" aria-live="polite"></div>
+              </section>
+
+              <div class="admin-upload">
+                <label class="subtle" for="adminUploadImages">Upload product images (crop 4:3 before apply)</label>
+                <input class="form-input" id="adminUploadImages" type="file" accept="image/*" multiple />
+                <button class="chip" id="adminUploadBtn" type="button">Use selected images</button>
+                <p class="admin-upload-msg subtle" id="adminUploadMessage"></p>
+              </div>
+
+              <details class="admin-manual-images">
+                <summary class="subtle">Advanced: set image URLs/paths manually (optional)</summary>
+                <input class="form-input" id="adminImageInput" type="text" placeholder="Primary image URL or path (optional)" />
+                <textarea
+                  class="form-input"
+                  id="adminImagesInput"
+                  rows="3"
+                  placeholder="Additional image URLs/paths (one per line)"
+                ></textarea>
+              </details>
+
+              <input class="form-input" id="adminRatingInput" type="number" min="1" max="5" step="0.1" placeholder="Rating (1 to 5)" required />
+              <p class="admin-upload-msg subtle" id="adminValidationMessage"></p>
+              <div class="admin-product-actions">
+                <button class="btn btn-primary" id="adminSaveBtn" type="submit">Save Product</button>
+                <button class="btn btn-ghost" id="adminResetBtn" type="button">Reset Fields</button>
+                <button class="chip" id="adminEditCancelBtn" type="button">Cancel Edit</button>
+              </div>
+            </form>
+
+            <aside class="glass-panel admin-preview-panel" id="adminPreviewPanel" aria-live="polite">
+              <p class="eyebrow">Live Preview</p>
+              <article class="admin-preview-card">
+                <img id="adminPreviewImage" src="assets/gallery/premium-glass-hookah.jpg" alt="Preview" loading="lazy" decoding="async" />
+                <div class="admin-preview-body">
+                  <div class="admin-preview-title-row">
+                    <div>
+                      <p class="eyebrow" id="adminPreviewType">traditional</p>
+                      <h4 id="adminPreviewName">Product name</h4>
+                    </div>
+                    <span class="badge" id="adminPreviewPrice">Rs 0</span>
+                  </div>
+                  <p class="subtle" id="adminPreviewNote">Short product note preview.</p>
+                  <div class="admin-preview-meta">
+                    <span class="badge" id="adminPreviewBadge">Featured</span>
+                    <span class="chip" id="adminPreviewRating">Rating 4.6</span>
+                  </div>
+                  <div class="admin-preview-thumbs" id="adminPreviewThumbs"></div>
+                </div>
+              </article>
+            </aside>
+          </div>
           <p class="admin-auth-msg subtle" id="adminStatusMessage"></p>
         </div>
 
         <div class="glass-panel admin-panel">
           <h3>Current Products</h3>
           <p class="subtle">These entries drive the product cards on your main website.</p>
+          <div class="admin-list-toolbar">
+            <input class="form-input" id="adminListSearch" type="search" placeholder="Search by name, type, badge, note..." />
+            <div class="chip-group" id="adminListTypeFilter">
+              <button class="chip active" type="button" data-admin-type-filter="all">All</button>
+              <button class="chip" type="button" data-admin-type-filter="traditional">Traditional</button>
+              <button class="chip" type="button" data-admin-type-filter="glass">Glass</button>
+              <button class="chip" type="button" data-admin-type-filter="flavors">Flavors</button>
+              <button class="chip" type="button" data-admin-type-filter="accessories">Accessories</button>
+            </div>
+            <select class="chip select" id="adminListSort" aria-label="Sort admin products">
+              <option value="newest">Newest first</option>
+              <option value="name-asc">Name A to Z</option>
+              <option value="price-desc">Price high to low</option>
+              <option value="price-asc">Price low to high</option>
+            </select>
+          </div>
           <div class="admin-list" id="adminProductList" aria-live="polite"></div>
         </div>
       </section>
     </div>
   </main>
 
+  <div class="modal hidden admin-crop-modal" id="adminCropModal" role="dialog" aria-modal="true" aria-labelledby="adminCropTitle">
+    <div class="modal-backdrop" data-crop-close></div>
+    <div class="modal-card glass-panel admin-crop-card">
+      <button class="modal-close" id="adminCropCancelBtn" type="button" aria-label="Cancel upload">x</button>
+      <div class="admin-crop-body">
+        <p class="eyebrow">Image Crop</p>
+        <h3 id="adminCropTitle">Adjust image to 4:3 ratio</h3>
+        <p class="subtle" id="adminCropMeta"></p>
+
+        <div class="admin-crop-canvas-wrap">
+          <canvas id="adminCropCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div class="admin-crop-controls">
+          <label class="subtle" for="adminCropZoom">Zoom</label>
+          <input class="form-input" id="adminCropZoom" type="range" min="1" max="3" step="0.01" value="1" />
+          <label class="subtle" for="adminCropX">Horizontal</label>
+          <input class="form-input" id="adminCropX" type="range" min="-100" max="100" step="1" value="0" />
+          <label class="subtle" for="adminCropY">Vertical</label>
+          <input class="form-input" id="adminCropY" type="range" min="-100" max="100" step="1" value="0" />
+          <label class="admin-github-toggle subtle" for="adminCropApplyDefaults">
+            <input id="adminCropApplyDefaults" type="checkbox" />
+            Apply same crop defaults to remaining images
+          </label>
+        </div>
+
+        <div class="admin-product-actions">
+          <button class="btn btn-ghost" id="adminCropSkipBtn" type="button">Skip image</button>
+          <button class="btn btn-primary" id="adminCropApplyBtn" type="button">Use crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/data/products.js" defer></script>
   <script src="admin.js" defer></script>
 </body>
 </html>

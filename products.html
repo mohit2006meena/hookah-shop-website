@@ -26,59 +26,59 @@
   </nav>
   <div class="nav-overlay" id="navOverlay"></div>
 
-  <main class="section" style="padding-top:140px;">
-    <div class="container section-heading">
-      <div>
-        <p class="eyebrow">Collection</p>
-        <h1>Curated for every ritual</h1>
-        <p class="subtle">Filter by build, sort by price, and tap for quick specs.</p>
-      </div>
-      <div class="filters">
-        <input
-          type="search"
-          id="productSearch"
-          class="chip search-input"
-          placeholder="Search products..."
-          aria-label="Search products"
-        />
-        <div class="chip-group" id="filterChips">
-          <button class="chip active" data-filter="all">All</button>
-          <button class="chip" data-filter="traditional">Traditional</button>
-          <button class="chip" data-filter="glass">Glass</button>
-          <button class="chip" data-filter="flavors">Flavors</button>
-          <button class="chip" data-filter="accessories">Accessories</button>
+  <main class="section page-main section-collection">
+    <div class="container collection-hero glass-panel">
+      <div class="section-heading collection-hero-head">
+        <div>
+          <p class="eyebrow">Collection</p>
+          <h1>Curated for every ritual</h1>
+          <p class="subtle">Filter by build, sort by price, and tap for quick specs.</p>
         </div>
-        <select class="chip select" id="sortSelect" aria-label="Sort products">
-          <option value="featured">Featured</option>
-          <option value="price-asc">Price: Low to High</option>
-          <option value="price-desc">Price: High to Low</option>
-          <option value="new">Newest</option>
-        </select>
+        <div class="filters">
+          <input
+            type="search"
+            id="productSearch"
+            class="chip search-input"
+            placeholder="Search products..."
+            aria-label="Search products"
+          />
+          <div class="chip-group" id="filterChips">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="traditional">Traditional</button>
+            <button class="chip" data-filter="glass">Glass</button>
+            <button class="chip" data-filter="flavors">Flavors</button>
+            <button class="chip" data-filter="accessories">Accessories</button>
+          </div>
+          <select class="chip select" id="sortSelect" aria-label="Sort products">
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="new">Newest</option>
+          </select>
+        </div>
+      </div>
+      <div class="collection-trust-row" aria-label="Collection highlights">
+        <span class="collection-trust-pill">Premium Lounge Picks</span>
+        <span class="collection-trust-pill">Fast Jaipur Delivery</span>
+        <span class="collection-trust-pill">UPI + COD Available</span>
       </div>
     </div>
 
-    <div class="container">
+    <div class="container collection-results-row">
       <p class="subtle result-count" id="resultCount">0 products</p>
     </div>
     <div class="container product-grid" id="productGrid"></div>
 
-    <section class="shop-flavors" id="shopFlavors">
-      <div class="container section-heading">
-        <div>
-          <p class="eyebrow">Flavors Menu</p>
-          <h2>Premium Hookah Flavors</h2>
-          <p class="subtle">Choose your base profile and pair it with recommended mix-ins.</p>
-        </div>
-      </div>
-      <div class="container shop-flavor-catalog" id="shopFlavorCatalog" aria-live="polite"></div>
-    </section>
   </main>
 
   <div class="modal hidden" id="productModal" role="dialog" aria-modal="true">
     <div class="modal-backdrop" data-close></div>
     <div class="modal-card glass-panel">
       <button class="modal-close" data-close aria-label="Close">x</button>
-      <img id="modalImg" alt="" />
+      <div class="modal-media">
+        <img id="modalImg" alt="" />
+        <div class="modal-thumbs" id="modalThumbs" aria-label="Product images"></div>
+      </div>
       <div class="modal-body">
         <p class="eyebrow" id="modalBadge"></p>
         <h3 id="modalTitle"></h3>
@@ -152,6 +152,7 @@
   </footer>
 
   <script src="flavors.js" defer></script>
+  <script src="assets/data/products.js" defer></script>
   <script src="script.js" defer></script>
 </body>
 </html>

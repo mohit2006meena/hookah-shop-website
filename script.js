@@ -93,8 +93,9 @@ window.addEventListener('resize', () => {
 const navbar = document.getElementById('navbar');
 const progressBar = document.getElementById('progressBar');
 const backToTop = document.getElementById('backToTop');
+let scrollFrame = null;
 
-function handleScroll() {
+function updateScrollUI() {
   const y = window.scrollY;
   if (navbar) navbar.classList.toggle('shrink', y > 30);
   if (backToTop) backToTop.classList.toggle('show', y > 400);
@@ -104,14 +105,59 @@ function handleScroll() {
     progressBar.style.width = `${pct}%`;
   }
 }
-window.addEventListener('scroll', handleScroll);
+
+function requestScrollUIUpdate() {
+  if (scrollFrame) return;
+  scrollFrame = window.requestAnimationFrame(() => {
+    scrollFrame = null;
+    updateScrollUI();
+  });
+}
+
+window.addEventListener('scroll', requestScrollUIUpdate, { passive: true });
+window.addEventListener('resize', requestScrollUIUpdate, { passive: true });
+requestScrollUIUpdate();
 if (backToTop) {
   backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
+function initLazyMaps() {
+  const maps = Array.from(document.querySelectorAll('iframe.js-lazy-map[data-map-src]'));
+  if (!maps.length) return;
+
+  const loadMap = (frame) => {
+    const src = frame.getAttribute('data-map-src');
+    if (!src) return;
+    if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+    frame.removeAttribute('data-map-src');
+  };
+
+  if (!('IntersectionObserver' in window)) {
+    maps.forEach(loadMap);
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const frame = entry.target;
+        if (!(frame instanceof HTMLIFrameElement)) return;
+        loadMap(frame);
+        observer.unobserve(frame);
+      });
+    },
+    { rootMargin: '280px 0px' }
+  );
+
+  maps.forEach((frame) => observer.observe(frame));
+}
+document.addEventListener('DOMContentLoaded', initLazyMaps);
+
 /* Smooth scroll (Lenis) */
 let lenis;
-if (!prefersReduced && window.Lenis) {
+const canUseLenis = !prefersReduced && window.Lenis && window.innerWidth > 1024 && (navigator.hardwareConcurrency || 8) >= 6;
+if (canUseLenis) {
   lenis = new Lenis({
     smooth: true,
     direction: 'vertical',
@@ -140,7 +186,7 @@ function initGSAP() {
     });
   }
 
-  if (document.querySelector('#timeline')) {
+  if (document.querySelector('#timeline') && window.innerWidth > 980) {
     ScrollTrigger.create({
       trigger: '#timeline',
       start: 'top center',
@@ -150,7 +196,9 @@ function initGSAP() {
     });
   }
 
-  document.querySelectorAll('.glass-panel, .section-heading, .product-card, .gallery-item, .flavor-card').forEach((el, i) => {
+  const revealTargets = Array.from(document.querySelectorAll('.glass-panel, .section-heading, .product-card, .gallery-item, .flavor-card'));
+  const revealCap = window.innerWidth < 768 ? 22 : 48;
+  revealTargets.slice(0, revealCap).forEach((el, i) => {
     gsap.fromTo(
       el,
       { y: 30, opacity: 0 },
@@ -159,7 +207,7 @@ function initGSAP() {
         opacity: 1,
         duration: 0.8,
         delay: (i % 6) * 0.05,
-        scrollTrigger: { trigger: el, start: 'top 90%' }
+        scrollTrigger: { trigger: el, start: 'top 90%', once: true }
       }
     );
   });
@@ -169,22 +217,33 @@ document.addEventListener('DOMContentLoaded', initGSAP);
 /* Shared 3D tilt for premium card feel */
 function initCardTilt() {
   const allowTilt = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-  if (!allowTilt || prefersReduced) return;
+  if (!allowTilt || prefersReduced || window.innerWidth < 1024) return;
 
-  const cards = document.querySelectorAll('.glass-panel, .product-card');
+  const cards = Array.from(document.querySelectorAll('.glass-panel, .product-card')).slice(0, 24);
   cards.forEach((card) => {
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const rotateX = ((y - centerY) / centerY) * -4;
-      const rotateY = ((x - centerX) / centerX) * 4;
-      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    let pending = false;
+    let pointerX = 0;
+    let pointerY = 0;
+
+    card.addEventListener('pointermove', (event) => {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (pending) return;
+      pending = true;
+      window.requestAnimationFrame(() => {
+        pending = false;
+        const rect = card.getBoundingClientRect();
+        const x = pointerX - rect.left;
+        const y = pointerY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = ((y - centerY) / centerY) * -4;
+        const rotateY = ((x - centerX) / centerX) * 4;
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+      });
     });
 
-    card.addEventListener('mouseleave', () => {
+    card.addEventListener('pointerleave', () => {
       card.style.transform = '';
     });
   });
@@ -391,12 +450,34 @@ async function initGoogleReviewsSection() {
     setReviewStatus(statusEl, 'Google reviews are temporarily unavailable here. Tap below to view live reviews on Google.', true);
   }
 }
+function initGoogleReviewsOnDemand() {
+  const gridEl = document.getElementById('googleReviewsGrid');
+  if (!gridEl) return;
 
-document.addEventListener('DOMContentLoaded', initGoogleReviewsSection);
+  if (!('IntersectionObserver' in window)) {
+    initGoogleReviewsSection();
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      if (!entry || !entry.isIntersecting) return;
+      observer.disconnect();
+      initGoogleReviewsSection();
+    },
+    { rootMargin: '240px 0px' }
+  );
+
+  observer.observe(gridEl);
+}
+
+document.addEventListener('DOMContentLoaded', initGoogleReviewsOnDemand);
 
 /* Featured carousel (home) */
 const featuredData = [
   {
+    productId: 'modern-glass-tower',
     title: 'Cyber Glass',
     badge: 'New',
     price: 'Rs 4,999',
@@ -404,6 +485,7 @@ const featuredData = [
     img: 'assets/gallery/premium-glass-hookah.jpg'
   },
   {
+    productId: 'classic-brass-hookah',
     title: 'Royal Brass',
     badge: 'Limited',
     price: 'Rs 3,499',
@@ -411,6 +493,7 @@ const featuredData = [
     img: 'assets/gallery/Traditional-Brass-Hookah.jpg'
   },
   {
+    productId: 'mini-portable-hookah',
     title: 'Mini Traveler',
     badge: 'Staff Pick',
     price: 'Rs 1,999',
@@ -418,6 +501,7 @@ const featuredData = [
     img: 'assets/gallery/Classic-Brass-Hookah.jpg'
   },
   {
+    productId: 'double-apple-flavor',
     title: 'Exotic Flavors Set',
     badge: 'New',
     price: 'Rs 999',
@@ -429,8 +513,12 @@ const featuredData = [
 const featuredTrack = document.getElementById('featuredTrack');
 if (featuredTrack) {
   featuredData.forEach((item) => {
-    const card = document.createElement('article');
-    card.className = 'glass-panel carousel-card';
+    const card = document.createElement('a');
+    card.className = 'glass-panel carousel-card carousel-link';
+    card.href = '#';
+    card.dataset.quick = item.productId;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `View ${item.title}`);
     card.innerHTML = `
       <img src="${item.img}" alt="${item.title}" loading="lazy" decoding="async">
       <div class="card-overlay">
@@ -476,6 +564,7 @@ const defaultProducts = [
     badge: 'Limited',
     note: 'Hand-etched stem, velvet hose',
     image: 'assets/gallery/Classic-Brass-Hookah.jpg',
+    images: ['assets/gallery/Classic-Brass-Hookah.jpg', 'assets/gallery/Traditional-Brass-Hookah.jpg'],
     rating: 4.8
   },
   {
@@ -486,6 +575,7 @@ const defaultProducts = [
     badge: 'New',
     note: 'Borosilicate, diffused downstem',
     image: 'assets/gallery/premium-glass-hookah.jpg',
+    images: ['assets/gallery/premium-glass-hookah.jpg', 'assets/gallery/shop-front.jpg'],
     rating: 4.9
   },
   {
@@ -496,6 +586,7 @@ const defaultProducts = [
     badge: 'Staff Pick',
     note: 'Travel case, silicone hose',
     image: 'assets/gallery/shop-front.jpg',
+    images: ['assets/gallery/shop-front.jpg', 'assets/gallery/premium-glass-hookah.jpg'],
     rating: 4.6
   },
   {
@@ -506,6 +597,7 @@ const defaultProducts = [
     badge: 'New',
     note: 'Heat retaining bowl',
     image: 'assets/gallery/owner.jpg',
+    images: ['assets/gallery/owner.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
     rating: 4.5
   },
   {
@@ -516,6 +608,7 @@ const defaultProducts = [
     badge: 'Fast Moving',
     note: 'Low ash, long burn',
     image: 'assets/gallery/shop-front.jpg',
+    images: ['assets/gallery/shop-front.jpg', 'assets/gallery/owner.jpg'],
     rating: 4.7
   },
   {
@@ -526,6 +619,7 @@ const defaultProducts = [
     badge: 'Classic',
     note: 'Rich anise finish',
     image: 'assets/gallery/Traditional-Brass-Hookah.jpg',
+    images: ['assets/gallery/Traditional-Brass-Hookah.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
     rating: 4.7
   },
   {
@@ -536,6 +630,7 @@ const defaultProducts = [
     badge: 'Fresh',
     note: 'Cooling mint cloud',
     image: 'assets/gallery/premium-glass-hookah.jpg',
+    images: ['assets/gallery/premium-glass-hookah.jpg', 'assets/gallery/Traditional-Brass-Hookah.jpg'],
     rating: 4.8
   },
   {
@@ -546,6 +641,7 @@ const defaultProducts = [
     badge: 'Limited',
     note: 'Collector edition',
     image: 'assets/gallery/Traditional-Brass-Hookah.jpg',
+    images: ['assets/gallery/Traditional-Brass-Hookah.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
     rating: 4.8
   }
 ];
@@ -571,6 +667,21 @@ function sanitizeProductInput(product, index = 0) {
   const rating = Number.isFinite(ratingRaw) ? Math.max(1, Math.min(5, ratingRaw)) : 4.6;
   const idSource = product && product.id ? product.id : name;
   const id = makeProductId(idSource, index);
+  const fallbackImage = 'assets/gallery/premium-glass-hookah.jpg';
+  const primaryImage = String(product && product.image ? product.image : fallbackImage).trim() || fallbackImage;
+  const parsedImages = Array.isArray(product && product.images)
+    ? product.images
+    : String(product && product.images ? product.images : '')
+        .split(/[,\n]/)
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean);
+  const images = [];
+  [primaryImage, ...parsedImages].forEach((src) => {
+    const token = String(src || '').trim();
+    if (!token || images.includes(token)) return;
+    images.push(token);
+  });
+  if (!images.length) images.push(fallbackImage);
 
   return {
     id,
@@ -579,12 +690,17 @@ function sanitizeProductInput(product, index = 0) {
     price,
     badge: String(product && product.badge ? product.badge : 'Featured').trim() || 'Featured',
     note: String(product && product.note ? product.note : 'Premium quality selection').trim() || 'Premium quality selection',
-    image: String(product && product.image ? product.image : 'assets/gallery/premium-glass-hookah.jpg').trim() || 'assets/gallery/premium-glass-hookah.jpg',
+    image: images[0],
+    images,
     rating
   };
 }
 
 function loadProductsCatalog() {
+  const remoteProducts = Array.isArray(window.sheeshaProducts) ? window.sheeshaProducts : [];
+  if (remoteProducts.length) {
+    return remoteProducts.map((item, index) => sanitizeProductInput(item, index));
+  }
   const fallback = defaultProducts.map((item, index) => sanitizeProductInput(item, index));
 
   try {
@@ -679,6 +795,33 @@ const flavorCatalog = flavorSeed.map((flavor, index) => {
   };
 });
 
+function normalizeFlavorName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+flavor$/i, '');
+}
+
+function buildStoreCatalogProducts(baseProducts, flavorItems) {
+  const merged = [...baseProducts];
+  const existingFlavorNames = new Set(
+    baseProducts
+      .filter((item) => item.type === 'flavors')
+      .map((item) => normalizeFlavorName(item.name))
+  );
+
+  flavorItems.forEach((item) => {
+    const key = normalizeFlavorName(item.name);
+    if (!key || existingFlavorNames.has(key)) return;
+    existingFlavorNames.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+}
+
+const storefrontProducts = buildStoreCatalogProducts(products, flavorCatalog);
+
 function renderShopFlavorCatalog() {
   if (!shopFlavorCatalogHost) return;
 
@@ -718,7 +861,7 @@ const cartStorageKey = 'sheesha_cart_v3';
 const shippingRates = { standard: 79, express: 199, pickup: 0 };
 let cartState = loadCartState();
 
-[...products, ...flavorCatalog].forEach((item) => {
+storefrontProducts.forEach((item) => {
   catalogById.set(item.id, item);
   catalogByName.set(item.name.toLowerCase(), item);
   if (item.name.toLowerCase().endsWith(' flavor')) {
@@ -752,7 +895,7 @@ function renderProducts(filter = 'all', sort = 'featured', query = '') {
   const resultCount = document.getElementById('resultCount');
   productGrid.innerHTML = '';
 
-  let list = products.filter((item) => filter === 'all' || item.type === filter);
+  let list = storefrontProducts.filter((item) => filter === 'all' || item.type === filter);
 
   if (query.trim()) {
     const searchTerm = query.trim().toLowerCase();
@@ -777,10 +920,11 @@ function renderProducts(filter = 'all', sort = 'featured', query = '') {
   }
 
   list.forEach((item) => {
+    const primaryImage = Array.isArray(item.images) && item.images.length ? item.images[0] : item.image;
     const card = document.createElement('article');
     card.className = 'glass-panel product-card';
     card.innerHTML = `
-      <img src="${item.image}" alt="${item.name}" loading="lazy" decoding="async">
+      <img src="${primaryImage}" alt="${item.name}" loading="lazy" decoding="async">
       <div class="product-info">
         <div class="product-top">
           <div>
@@ -849,11 +993,59 @@ const modalType = document.getElementById('modalType');
 const modalPrice = document.getElementById('modalPrice');
 const modalCTA = document.getElementById('modalCTA');
 const modalAddToCart = document.getElementById('modalAddToCart');
+const modalThumbs = document.getElementById('modalThumbs');
+
+function getProductImages(item) {
+  if (!item) return [];
+  const images = Array.isArray(item.images) ? item.images : [];
+  const fallback = String(item.image || '').trim();
+  const merged = [];
+  [...images, fallback].forEach((src) => {
+    const token = String(src || '').trim();
+    if (!token || merged.includes(token)) return;
+    merged.push(token);
+  });
+  return merged;
+}
+
+function setModalMainImage(src, altText) {
+  if (!modalImg) return;
+  modalImg.src = src;
+  modalImg.alt = altText || 'Product image';
+}
+
+function renderModalThumbs(item) {
+  if (!modalThumbs) return;
+  const images = getProductImages(item);
+  if (!images.length) {
+    modalThumbs.innerHTML = '';
+    return;
+  }
+
+  modalThumbs.innerHTML = images
+    .map(
+      (src, idx) => `
+        <button
+          class="modal-thumb ${idx === 0 ? 'is-active' : ''}"
+          type="button"
+          data-modal-image="${escapeHtml(src)}"
+          aria-label="View image ${idx + 1}"
+        >
+          <img src="${escapeHtml(src)}" alt="${escapeHtml(item.name)} image ${idx + 1}" loading="lazy" decoding="async" />
+        </button>
+      `
+    )
+    .join('');
+}
 
 function openModal(id) {
   const item = catalogById.get(id);
   if (!item || !modal) return;
-  if (modalImg) modalImg.src = item.image;
+  const modalImages = getProductImages(item);
+  const primaryImage = modalImages.length ? modalImages[0] : item.image;
+  setModalMainImage(primaryImage, item.name);
+  renderModalThumbs(item);
+  modal.dataset.productId = item.id;
   if (modalTitle) modalTitle.textContent = item.name;
   if (modalBadge) modalBadge.textContent = item.badge;
   if (modalNote) modalNote.textContent = item.note;
@@ -869,9 +1061,19 @@ function openModal(id) {
   document.body.style.overflow = 'hidden';
 }
 
+function openProductFromQuery() {
+  if (!productGrid || !modal) return;
+  const params = new URLSearchParams(window.location.search);
+  const requestedId = String(params.get('product') || '').trim();
+  if (!requestedId || !catalogById.has(requestedId)) return;
+  openModal(requestedId);
+}
+
 function closeModal() {
   if (!modal) return;
   modal.classList.add('hidden');
+  if (modalThumbs) modalThumbs.innerHTML = '';
+  delete modal.dataset.productId;
   document.body.style.overflow = '';
 }
 
@@ -886,7 +1088,24 @@ document.addEventListener('click', (e) => {
 
   const quickTrigger = target.closest('[data-quick]');
   if (quickTrigger && quickTrigger.dataset.quick) {
+    if (quickTrigger instanceof HTMLAnchorElement) {
+      e.preventDefault();
+    }
     openModal(quickTrigger.dataset.quick);
+    return;
+  }
+
+  const modalImageTrigger = target.closest('[data-modal-image]');
+  if (modalImageTrigger && modalImageTrigger.dataset.modalImage) {
+    const src = modalImageTrigger.dataset.modalImage;
+    const productId = modal && modal.dataset.productId ? modal.dataset.productId : '';
+    const modalItem = productId ? catalogById.get(productId) : null;
+    setModalMainImage(src, modalItem ? modalItem.name : 'Product image');
+    if (modalThumbs) {
+      modalThumbs.querySelectorAll('.modal-thumb').forEach((node) => {
+        node.classList.toggle('is-active', node === modalImageTrigger);
+      });
+    }
     return;
   }
 
@@ -962,12 +1181,26 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    const active = document.activeElement;
+    if (active instanceof Element) {
+      const quickTarget = active.closest('[data-quick]');
+      if (quickTarget && quickTarget.dataset.quick) {
+        e.preventDefault();
+        openModal(quickTarget.dataset.quick);
+        return;
+      }
+    }
+  }
+
   if (e.key !== 'Escape') return;
   closeNav();
   closeModal();
   closeLightbox();
   closeCart();
 });
+
+openProductFromQuery();
 
 /* Lightbox */
 const lightbox = document.getElementById('lightbox');

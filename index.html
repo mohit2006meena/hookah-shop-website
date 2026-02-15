@@ -87,7 +87,13 @@ Open: http://localhost:5500/index.html
             <div class="stat"><span>25+</span><small>Flavors stocked</small></div>
           </div>
         </div>
-        <div class="hero-card glass-panel floating">
+        <article
+          class="hero-card hero-quick-card glass-panel floating"
+          data-quick="modern-glass-tower"
+          tabindex="0"
+          role="button"
+          aria-label="View Cyber Glass details"
+        >
           <img src="assets/gallery/premium-glass-hookah.jpg" alt="Premium hookah" loading="lazy" />
           <div class="hero-card-body">
             <div>
@@ -97,7 +103,7 @@ Open: http://localhost:5500/index.html
             </div>
             <span class="badge badge-new">New</span>
           </div>
-        </div>
+        </article>
       </div>
     </section>
 
@@ -294,11 +300,45 @@ Open: http://localhost:5500/index.html
           </div>
         </div>
         <div class="glass-panel map-embed">
-          <iframe src="https://www.google.com/maps?q=Sheesha%20Hookah%20Shop%2C%20Gopal%20Pura%20Mode%2C%20Jaipur&output=embed" width="100%" height="100%" style="border:0; filter: saturate(0.7) contrast(1.05);" allowfullscreen="" loading="lazy"></iframe>
+          <iframe
+            src="about:blank"
+            data-map-src="https://www.google.com/maps?q=Sheesha%20Hookah%20Shop%2C%20Gopal%20Pura%20Mode%2C%20Jaipur&output=embed"
+            title="Sheesha Hookah shop location map"
+            class="js-lazy-map"
+            width="100%"
+            height="100%"
+            style="border:0; filter: saturate(0.7) contrast(1.05);"
+            allowfullscreen=""
+            loading="lazy"
+          ></iframe>
         </div>
       </div>
     </section>
   </main>
+
+  <div class="modal hidden" id="productModal" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card glass-panel">
+      <button class="modal-close" data-close aria-label="Close">x</button>
+      <div class="modal-media">
+        <img id="modalImg" alt="" />
+        <div class="modal-thumbs" id="modalThumbs" aria-label="Product images"></div>
+      </div>
+      <div class="modal-body">
+        <p class="eyebrow" id="modalBadge"></p>
+        <h3 id="modalTitle"></h3>
+        <p class="subtle" id="modalNote"></p>
+        <div class="modal-meta">
+          <span id="modalType" class="chip"></span>
+          <span id="modalPrice" class="badge"></span>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" type="button" id="modalAddToCart" data-add-cart="">Add to cart</button>
+          <a class="btn btn-ghost" id="modalCTA" href="#" target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <a class="fab whatsapp" href="https://wa.me/917790813469" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -357,6 +397,7 @@ Open: http://localhost:5500/index.html
   </footer>
 
   <script src="google-reviews-config.js" defer></script>
+  <script src="assets/data/products.js" defer></script>
   <script src="script.js" defer></script>
 </body>
 </html>

@@ -26,8 +26,8 @@
   </nav>
   <div class="nav-overlay" id="navOverlay"></div>
 
-  <main class="section" style="padding-top:140px;">
-    <div class="container section-heading">
+  <main class="section page-main">
+    <div class="container section-heading page-title-panel glass-panel">
       <div>
         <p class="eyebrow">Contact</p>
         <h1>Visit or book a lounge slot</h1>
@@ -46,7 +46,17 @@
       </div>
 
       <div class="glass-panel map-embed">
-        <iframe src="https://www.google.com/maps?q=Sheesha%20Hookah%20Shop%2C%20Gopal%20Pura%20Mode%2C%20Jaipur&output=embed" width="100%" height="100%" style="border:0; filter: saturate(0.7) contrast(1.05);" allowfullscreen="" loading="lazy"></iframe>
+        <iframe
+          src="about:blank"
+          data-map-src="https://www.google.com/maps?q=Sheesha%20Hookah%20Shop%2C%20Gopal%20Pura%20Mode%2C%20Jaipur&output=embed"
+          title="Sheesha Hookah shop location map"
+          class="js-lazy-map"
+          width="100%"
+          height="100%"
+          style="border:0; filter: saturate(0.7) contrast(1.05);"
+          allowfullscreen=""
+          loading="lazy"
+        ></iframe>
       </div>
 
       <div class="glass-panel contact-form">
@@ -133,6 +143,7 @@
     <div class="subtle center notice">18+ only. Tobacco consumption is injurious to health. Copyright 2025 SHEESHA HOOKAH.</div>
   </footer>
 
+  <script src="assets/data/products.js" defer></script>
   <script src="script.js" defer></script>
 </body>
 </html>
