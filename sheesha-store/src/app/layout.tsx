@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   description:
     'Premium hookahs, flavors, and accessories with a mobile-first luxury ecommerce experience. Fast checkout and trusted delivery in Jaipur.',
-  metadataBase: new URL('https://sheeshahookah.in'),
+  metadataBase: new URL('https://sheeshahookah.com'),
   openGraph: {
     title: 'SHEESHA HOOKAH',
     description: 'Premium modern hookah commerce with fast mobile checkout.',

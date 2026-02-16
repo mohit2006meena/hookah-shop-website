@@ -252,6 +252,10 @@ document.addEventListener('DOMContentLoaded', initCardTilt);
 
 /* Google reviews (live Places API + graceful fallback) */
 let googlePlacesLoaderPromise;
+let googleReviewsInitPromise;
+const GOOGLE_REVIEWS_CACHE_KEY = 'sheesha_google_reviews_cache_v1';
+const GOOGLE_REVIEWS_CACHE_TTL_MS = 1000 * 60 * 30;
+const GOOGLE_REVIEWS_FETCH_TIMEOUT_MS = 6000;
 
 function escapeReviewHtml(value) {
   return String(value ?? '')
@@ -303,7 +307,7 @@ function renderGoogleReviews(gridEl, reviews) {
     gridEl.innerHTML = `
       <article class="glass-panel testimonial-card review-empty-card">
         <span class="quote-symbol">"</span>
-        <p class="testimonial-text">Latest reviews are unavailable here right now. Tap the Google button below to see live guest feedback.</p>
+        <p class="testimonial-text">Tap the Google button below to view the latest guest feedback.</p>
         <div class="reviewer">
           <div class="reviewer-avatar" aria-hidden="true">G</div>
           <div>
@@ -343,6 +347,83 @@ function renderGoogleReviews(gridEl, reviews) {
       `;
     })
     .join('');
+}
+
+function getConfiguredFallbackReviews(config) {
+  const source = Array.isArray(config?.fallbackReviews) ? config.fallbackReviews : [];
+
+  return source
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const author = String(item.author_name || item.author || '').trim();
+      const text = String(item.text || item.comment || '').trim();
+      if (!author || !text) return null;
+
+      const ratingValue = Math.max(1, Math.min(5, Number(item.rating) || 5));
+
+      return {
+        author_name: author,
+        text,
+        rating: ratingValue,
+        relative_time_description: String(item.relative_time_description || item.timeLabel || 'Google Review').trim(),
+        profile_photo_url: String(item.profile_photo_url || '').trim()
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function loadGoogleReviewsCache() {
+  try {
+    const raw = window.localStorage.getItem(GOOGLE_REVIEWS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!Array.isArray(parsed.reviews)) return null;
+    if (!Number.isFinite(Number(parsed.fetchedAt))) return null;
+    return {
+      fetchedAt: Number(parsed.fetchedAt),
+      url: String(parsed.url || ''),
+      rating: Number(parsed.rating) || 0,
+      totalRatings: Number(parsed.totalRatings) || 0,
+      reviews: parsed.reviews
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function saveGoogleReviewsCache(payload) {
+  try {
+    if (!payload || !Array.isArray(payload.reviews)) return;
+    window.localStorage.setItem(
+      GOOGLE_REVIEWS_CACHE_KEY,
+      JSON.stringify({
+        fetchedAt: Date.now(),
+        url: String(payload.url || ''),
+        rating: Number(payload.rating) || 0,
+        totalRatings: Number(payload.totalRatings) || 0,
+        reviews: payload.reviews.slice(0, 3)
+      })
+    );
+  } catch (_error) {
+    // localStorage can fail in private browsing; ignore
+  }
+}
+
+function withTimeout(promise, timeoutMs, errorMessage) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, timeoutMs);
+
+    promise
+      .then((result) => resolve(result))
+      .catch((error) => reject(error))
+      .finally(() => {
+        window.clearTimeout(timer);
+      });
+  });
 }
 
 function loadGooglePlaces(apiKey) {
@@ -413,49 +494,122 @@ function fetchGooglePlaceDetails(placeId) {
   });
 }
 
-async function initGoogleReviewsSection() {
-  const gridEl = document.getElementById('googleReviewsGrid');
-  if (!gridEl) return;
+function initGoogleReviewsSection(forceRefresh = false) {
+  if (googleReviewsInitPromise) return googleReviewsInitPromise;
 
-  const statusEl = document.getElementById('googleReviewsStatus');
-  const linkEl = document.getElementById('googleReviewsLink');
-  const config = window.googleReviewsConfig || {};
-  const apiKey = String(config.apiKey || '').trim();
-  const placeId = String(config.placeId || '').trim();
-  const mapUrl = String(config.mapUrl || '').trim() || 'https://share.google/YnWp1UfxyE2ImFTRb';
+  const runPromise = (async () => {
+    const gridEl = document.getElementById('googleReviewsGrid');
+    if (!gridEl) return;
 
-  if (linkEl) linkEl.href = mapUrl;
+    const statusEl = document.getElementById('googleReviewsStatus');
+    const linkEl = document.getElementById('googleReviewsLink');
+    const config = window.googleReviewsConfig || {};
+    const apiKey = String(config.apiKey || '').trim();
+    const placeId = String(config.placeId || '').trim();
+    const mapUrl = String(config.mapUrl || '').trim() || 'https://share.google/YnWp1UfxyE2ImFTRb';
+    const fallbackReviews = getConfiguredFallbackReviews(config);
 
-  if (!apiKey || !placeId) {
-    renderGoogleReviews(gridEl, []);
-    setReviewStatus(statusEl, 'Add API key and Place ID in google-reviews-config.js to sync latest Google reviews.', true);
-    return;
-  }
+    if (linkEl) linkEl.href = mapUrl;
 
-  setReviewStatus(statusEl, 'Loading latest Google reviews...');
+    const cached = loadGoogleReviewsCache();
+    const hasFreshCache = Boolean(cached && Date.now() - cached.fetchedAt < GOOGLE_REVIEWS_CACHE_TTL_MS);
 
-  try {
-    await loadGooglePlaces(apiKey);
-    const details = await fetchGooglePlaceDetails(placeId);
+    if (cached) {
+      renderGoogleReviews(gridEl, cached.reviews);
+      if (linkEl && cached.url) linkEl.href = cached.url;
+      const ratingText = cached.rating > 0 ? `${cached.rating.toFixed(1)} rating` : 'Guest ratings';
+      const countText = cached.totalRatings > 0 ? `${cached.totalRatings} total reviews` : 'Live on Google';
+      setReviewStatus(statusEl, `Reviews ready: ${ratingText} · ${countText}`);
+      if (hasFreshCache && !forceRefresh) {
+        return;
+      }
+    }
 
-    if (linkEl && details.url) linkEl.href = details.url;
-    renderGoogleReviews(gridEl, details.reviews.slice(0, 3));
+    if (!apiKey || !placeId) {
+      if (!cached) {
+        renderGoogleReviews(gridEl, fallbackReviews);
+      }
+      if (fallbackReviews.length) {
+        setReviewStatus(statusEl, 'Showing highlighted guest feedback. Tap below for full live reviews on Google.');
+      } else {
+        setReviewStatus(statusEl, 'Tap below to view live guest feedback on Google.');
+      }
+      return;
+    }
 
-    const ratingText = details.rating > 0 ? `${details.rating.toFixed(1)} rating` : 'Guest ratings';
-    const countText = details.totalRatings > 0 ? `${details.totalRatings} total reviews` : 'Live on Google';
-    setReviewStatus(statusEl, `Live from Google: ${ratingText} · ${countText}`);
-  } catch (error) {
-    console.error('Failed to load Google reviews', error);
-    renderGoogleReviews(gridEl, []);
-    setReviewStatus(statusEl, 'Google reviews are temporarily unavailable here. Tap below to view live reviews on Google.', true);
-  }
+    if (!cached) {
+      setReviewStatus(statusEl, 'Loading latest Google reviews...');
+    } else {
+      setReviewStatus(statusEl, 'Refreshing latest Google reviews...');
+    }
+
+    try {
+      await withTimeout(
+        loadGooglePlaces(apiKey),
+        GOOGLE_REVIEWS_FETCH_TIMEOUT_MS,
+        'Google reviews request timeout'
+      );
+      const details = await withTimeout(
+        fetchGooglePlaceDetails(placeId),
+        GOOGLE_REVIEWS_FETCH_TIMEOUT_MS,
+        'Google reviews request timeout'
+      );
+
+      const latestReviews = details.reviews.slice(0, 3);
+      if (linkEl && details.url) linkEl.href = details.url;
+      renderGoogleReviews(gridEl, latestReviews);
+      saveGoogleReviewsCache({
+        url: details.url,
+        rating: details.rating,
+        totalRatings: details.totalRatings,
+        reviews: latestReviews
+      });
+
+      const ratingText = details.rating > 0 ? `${details.rating.toFixed(1)} rating` : 'Guest ratings';
+      const countText = details.totalRatings > 0 ? `${details.totalRatings} total reviews` : 'Live on Google';
+      setReviewStatus(statusEl, `Live from Google: ${ratingText} · ${countText}`);
+    } catch (error) {
+      console.error('Failed to load Google reviews', error);
+      if (!cached) {
+        if (fallbackReviews.length) {
+          renderGoogleReviews(gridEl, fallbackReviews);
+          setReviewStatus(statusEl, 'Showing highlighted guest feedback. Tap below for full live reviews on Google.');
+        } else {
+          renderGoogleReviews(gridEl, []);
+          setReviewStatus(statusEl, 'Live review sync is unavailable on this network. Tap below to view reviews on Google.');
+        }
+      } else {
+        setReviewStatus(statusEl, 'Showing saved reviews. Live refresh is temporarily unavailable.', true);
+      }
+    }
+  })();
+
+  googleReviewsInitPromise = runPromise;
+  runPromise.finally(() => {
+    if (googleReviewsInitPromise === runPromise) {
+      googleReviewsInitPromise = null;
+    }
+  });
+
+  return runPromise;
 }
+
 function initGoogleReviewsOnDemand() {
   const gridEl = document.getElementById('googleReviewsGrid');
   if (!gridEl) return;
 
+  const scheduleWarmup = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => initGoogleReviewsSection(false), { timeout: 2200 });
+    } else {
+      window.setTimeout(() => initGoogleReviewsSection(false), 1200);
+    }
+  };
+
+  scheduleWarmup();
+
   if (!('IntersectionObserver' in window)) {
-    initGoogleReviewsSection();
+    initGoogleReviewsSection(true);
     return;
   }
 
@@ -464,9 +618,9 @@ function initGoogleReviewsOnDemand() {
       const entry = entries[0];
       if (!entry || !entry.isIntersecting) return;
       observer.disconnect();
-      initGoogleReviewsSection();
+      initGoogleReviewsSection(true);
     },
-    { rootMargin: '240px 0px' }
+    { rootMargin: '1000px 0px' }
   );
 
   observer.observe(gridEl);
@@ -857,8 +1011,14 @@ function renderShopFlavorCatalog() {
 
 const catalogById = new Map();
 const catalogByName = new Map();
-const cartStorageKey = 'sheesha_cart_v3';
-const shippingRates = { standard: 79, express: 199, pickup: 0 };
+const cartStorageKey = 'sheesha_cart_v4';
+const shippingModes = new Set(['delivery', 'pickup']);
+const DELIVERY_RATE_PER_KM = 13;
+const STORE_LOCATION = Object.freeze({
+  lat: 26.8789,
+  lng: 75.7873,
+  label: 'SHEESHA HOOKAH, Gopal Pura Mode, Jaipur'
+});
 let cartState = loadCartState();
 
 storefrontProducts.forEach((item) => {
@@ -923,6 +1083,10 @@ function renderProducts(filter = 'all', sort = 'featured', query = '') {
     const primaryImage = Array.isArray(item.images) && item.images.length ? item.images[0] : item.image;
     const card = document.createElement('article');
     card.className = 'glass-panel product-card';
+    card.dataset.quick = item.id;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `View ${item.name} details`);
     card.innerHTML = `
       <img src="${primaryImage}" alt="${item.name}" loading="lazy" decoding="async">
       <div class="product-info">
@@ -951,9 +1115,20 @@ if (productGrid) {
   const chips = document.querySelectorAll('#filterChips .chip');
   const sortSelect = document.getElementById('sortSelect');
   const productSearch = document.getElementById('productSearch');
+  const allowedFilters = new Set(['all', 'traditional', 'glass', 'flavors', 'accessories']);
+  const allowedSort = new Set(['featured', 'price-asc', 'price-desc', 'new']);
+  const params = new URLSearchParams(window.location.search);
   let currentFilter = 'all';
   let currentSort = 'featured';
   let currentQuery = '';
+
+  const initialFilter = String(params.get('filter') || '').trim().toLowerCase();
+  const initialSort = String(params.get('sort') || '').trim().toLowerCase();
+  const initialQuery = String(params.get('q') || '').trim();
+
+  if (allowedFilters.has(initialFilter)) currentFilter = initialFilter;
+  if (allowedSort.has(initialSort)) currentSort = initialSort;
+  if (initialQuery) currentQuery = initialQuery;
 
   chips.forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -965,6 +1140,7 @@ if (productGrid) {
   });
 
   if (sortSelect) {
+    sortSelect.value = currentSort;
     sortSelect.addEventListener('change', (event) => {
       currentSort = event.target.value || 'featured';
       renderProducts(currentFilter, currentSort, currentQuery);
@@ -972,11 +1148,16 @@ if (productGrid) {
   }
 
   if (productSearch) {
+    productSearch.value = currentQuery;
     productSearch.addEventListener('input', (event) => {
       currentQuery = String(event.target.value || '');
       renderProducts(currentFilter, currentSort, currentQuery);
     });
   }
+
+  chips.forEach((item) => {
+    item.classList.toggle('active', (item.dataset.filter || 'all') === currentFilter);
+  });
 
   renderProducts(currentFilter, currentSort, currentQuery);
 }
@@ -1058,6 +1239,7 @@ function openModal(id) {
     modalAddToCart.dataset.addCart = item.id;
   }
   modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
   document.body.style.overflow = 'hidden';
 }
 
@@ -1074,6 +1256,7 @@ function closeModal() {
   modal.classList.add('hidden');
   if (modalThumbs) modalThumbs.innerHTML = '';
   delete modal.dataset.productId;
+  document.body.classList.remove('modal-open');
   document.body.style.overflow = '';
 }
 
@@ -1083,15 +1266,6 @@ document.addEventListener('click', (e) => {
 
   if (navOverlay && target === navOverlay) {
     closeNav();
-    return;
-  }
-
-  const quickTrigger = target.closest('[data-quick]');
-  if (quickTrigger && quickTrigger.dataset.quick) {
-    if (quickTrigger instanceof HTMLAnchorElement) {
-      e.preventDefault();
-    }
-    openModal(quickTrigger.dataset.quick);
     return;
   }
 
@@ -1124,6 +1298,33 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  if (target.id === 'pickOnMapBtn') {
+    openMapPicker();
+    return;
+  }
+
+  if (target.id === 'deliveryAddress') {
+    openMapPicker();
+    return;
+  }
+
+  if (target.closest('[data-close-map]')) {
+    closeMapPicker();
+    return;
+  }
+
+  if (target.id === 'mapUseLocationBtn') {
+    if (!mapPickerState.selectedLatLng) {
+      showCartToast('Select a point on map first');
+      return;
+    }
+    const { lat, lng } = mapPickerState.selectedLatLng;
+    setDeliveryLocation(lat, lng, mapPickerState.selectedAddress);
+    closeMapPicker();
+    showCartToast('Delivery location set');
+    return;
+  }
+
   const addCartTrigger = target.closest('[data-add-cart]');
   if (addCartTrigger && addCartTrigger.dataset.addCart) {
     addToCartById(addCartTrigger.dataset.addCart);
@@ -1133,6 +1334,15 @@ document.addEventListener('click', (e) => {
   const flavorTrigger = target.closest('[data-flavor-add]');
   if (flavorTrigger && flavorTrigger.dataset.flavorAdd) {
     addToCartByName(flavorTrigger.dataset.flavorAdd);
+    return;
+  }
+
+  const quickTrigger = target.closest('[data-quick]');
+  if (quickTrigger && quickTrigger.dataset.quick) {
+    if (quickTrigger instanceof HTMLAnchorElement) {
+      e.preventDefault();
+    }
+    openModal(quickTrigger.dataset.quick);
     return;
   }
 
@@ -1164,7 +1374,7 @@ document.addEventListener('change', (event) => {
   if (!(target instanceof HTMLSelectElement)) return;
 
   if (target.id === 'shippingSelect') {
-    cartState.shipping = Object.prototype.hasOwnProperty.call(shippingRates, target.value) ? target.value : 'standard';
+    cartState.shipping = shippingModes.has(target.value) ? target.value : 'delivery';
     saveCartState();
     renderCart();
   }
@@ -1184,7 +1394,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     const active = document.activeElement;
     if (active instanceof Element) {
-      const quickTarget = active.closest('[data-quick]');
+      const quickTarget = active.matches('[data-quick]') ? active : null;
       if (quickTarget && quickTarget.dataset.quick) {
         e.preventDefault();
         openModal(quickTarget.dataset.quick);
@@ -1196,6 +1406,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   closeNav();
   closeModal();
+  closeMapPicker();
   closeLightbox();
   closeCart();
 });
@@ -1266,8 +1477,50 @@ if (lightbox) {
 }
 
 /* Ecommerce cart */
+const mapPickerState = {
+  leafletReady: false,
+  map: null,
+  marker: null,
+  selectedLatLng: null,
+  selectedAddress: '',
+  selectedMapLink: '',
+  tileLayer: null
+};
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatDistanceKm(value) {
+  const number = toNumber(value);
+  if (number <= 0) return '0 km';
+  return `${number.toFixed(number >= 10 ? 1 : 2)} km`;
+}
+
+function buildGoogleMapsLink(lat, lng) {
+  return `https://maps.google.com/?q=${lat},${lng}`;
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371 * c;
+}
+
+function getDeliveryShippingCharge(distanceKm) {
+  const distance = toNumber(distanceKm);
+  if (distance <= 0) return 0;
+  return Math.ceil(distance) * DELIVERY_RATE_PER_KM;
+}
+
 function loadCartState() {
-  const fallback = { items: [], shipping: 'standard' };
+  const fallback = { items: [], shipping: 'delivery', deliveryDistanceKm: null, deliveryLocation: null };
 
   try {
     const raw = localStorage.getItem(cartStorageKey);
@@ -1275,9 +1528,26 @@ function loadCartState() {
 
     const parsed = JSON.parse(raw);
     const items = Array.isArray(parsed.items) ? parsed.items.filter(Boolean) : [];
-    const shipping = Object.prototype.hasOwnProperty.call(shippingRates, parsed.shipping) ? parsed.shipping : 'standard';
+    const shipping = shippingModes.has(parsed.shipping) ? parsed.shipping : 'delivery';
+    const deliveryDistanceKm = Number.isFinite(Number(parsed.deliveryDistanceKm))
+      ? Math.max(0, Number(parsed.deliveryDistanceKm))
+      : null;
 
-    return { items, shipping };
+    let deliveryLocation = null;
+    if (parsed.deliveryLocation && typeof parsed.deliveryLocation === 'object') {
+      const lat = Number(parsed.deliveryLocation.lat);
+      const lng = Number(parsed.deliveryLocation.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        deliveryLocation = {
+          lat,
+          lng,
+          mapLink: String(parsed.deliveryLocation.mapLink || buildGoogleMapsLink(lat, lng)),
+          addressText: String(parsed.deliveryLocation.addressText || '')
+        };
+      }
+    }
+
+    return { items, shipping, deliveryDistanceKm, deliveryLocation };
   } catch (_error) {
     return fallback;
   }
@@ -1311,18 +1581,26 @@ function sanitizeCartItem(item) {
 
 function normalizeCartState() {
   cartState.items = cartState.items.map(sanitizeCartItem).filter(Boolean);
-  if (!Object.prototype.hasOwnProperty.call(shippingRates, cartState.shipping)) cartState.shipping = 'standard';
+  if (!shippingModes.has(cartState.shipping)) cartState.shipping = 'delivery';
+  if (!Number.isFinite(cartState.deliveryDistanceKm)) cartState.deliveryDistanceKm = null;
+  if (
+    !cartState.deliveryLocation ||
+    !Number.isFinite(Number(cartState.deliveryLocation.lat)) ||
+    !Number.isFinite(Number(cartState.deliveryLocation.lng))
+  ) {
+    cartState.deliveryLocation = null;
+  }
 }
 
 function computeTotals() {
   const subtotal = cartState.items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const shippingBase = shippingRates[cartState.shipping] || shippingRates.standard;
-  const shipping = cartState.shipping === 'standard' && subtotal >= 3000 ? 0 : shippingBase;
+  const distanceKm = cartState.shipping === 'delivery' ? toNumber(cartState.deliveryDistanceKm) : 0;
+  const shipping = cartState.shipping === 'pickup' ? 0 : getDeliveryShippingCharge(distanceKm);
   const taxable = Math.max(0, subtotal);
   const tax = Math.round(taxable * 0.05);
   const total = taxable + shipping + tax;
 
-  return { subtotal, shipping, tax, total };
+  return { subtotal, shipping, tax, total, distanceKm };
 }
 
 let cartToastTimer = 0;
@@ -1337,6 +1615,159 @@ function showCartToast(message) {
   cartToastTimer = window.setTimeout(() => {
     toast.classList.remove('show');
   }, 1800);
+}
+
+function updateDeliveryAddressInput() {
+  const addressInput = document.getElementById('deliveryAddress');
+  if (!(addressInput instanceof HTMLTextAreaElement)) return;
+  if (!cartState.deliveryLocation) return;
+
+  const location = cartState.deliveryLocation;
+  const prefix = location.addressText ? `${location.addressText} | ` : '';
+  addressInput.value = `${prefix}${location.mapLink}`;
+}
+
+function setDeliveryLocation(lat, lng, addressText = '') {
+  const mapLink = buildGoogleMapsLink(lat, lng);
+  const distanceKm = haversineKm(STORE_LOCATION.lat, STORE_LOCATION.lng, lat, lng);
+  cartState.deliveryDistanceKm = Number(distanceKm.toFixed(2));
+  cartState.deliveryLocation = {
+    lat,
+    lng,
+    mapLink,
+    addressText: String(addressText || '').trim()
+  };
+  updateDeliveryAddressInput();
+  saveCartState();
+  renderCart();
+}
+
+function loadLeafletAssets() {
+  if (window.L) return Promise.resolve(window.L);
+  if (window.__leafletLoadPromise) return window.__leafletLoadPromise;
+
+  window.__leafletLoadPromise = new Promise((resolve, reject) => {
+    const cssId = 'leaflet-css';
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => resolve(window.L);
+    script.onerror = () => reject(new Error('Unable to load map library'));
+    document.head.appendChild(script);
+  });
+
+  return window.__leafletLoadPromise;
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+    );
+    if (!response.ok) return '';
+    const data = await response.json();
+    return String(data.display_name || '').trim();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function closeMapPicker() {
+  const modal = document.getElementById('mapPickerModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  document.body.style.overflow = '';
+}
+
+async function openMapPicker() {
+  const modal = document.getElementById('mapPickerModal');
+  const mapHost = document.getElementById('mapPickerCanvas');
+  const status = document.getElementById('mapPickerStatus');
+  if (!(modal instanceof HTMLElement) || !(mapHost instanceof HTMLElement)) return;
+
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  document.body.style.overflow = 'hidden';
+  if (status) status.textContent = 'Loading map...';
+
+  try {
+    await loadLeafletAssets();
+    if (!window.L) throw new Error('Map library not available');
+
+    const startLat = cartState.deliveryLocation ? cartState.deliveryLocation.lat : STORE_LOCATION.lat;
+    const startLng = cartState.deliveryLocation ? cartState.deliveryLocation.lng : STORE_LOCATION.lng;
+
+    if (!mapPickerState.map) {
+      mapPickerState.map = window.L.map(mapHost, {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([startLat, startLng], 13);
+
+      mapPickerState.tileLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      });
+      mapPickerState.tileLayer.addTo(mapPickerState.map);
+
+      window.L.marker([STORE_LOCATION.lat, STORE_LOCATION.lng], { title: STORE_LOCATION.label })
+        .addTo(mapPickerState.map)
+        .bindPopup('Store location');
+
+      mapPickerState.map.on('click', async (event) => {
+        const { lat, lng } = event.latlng;
+        mapPickerState.selectedLatLng = { lat, lng };
+        mapPickerState.selectedMapLink = buildGoogleMapsLink(lat, lng);
+        mapPickerState.selectedAddress = '';
+
+        if (!mapPickerState.marker) {
+          mapPickerState.marker = window.L.marker([lat, lng], { draggable: false }).addTo(mapPickerState.map);
+        } else {
+          mapPickerState.marker.setLatLng([lat, lng]);
+        }
+
+        if (status) status.textContent = `Selected: ${lat.toFixed(5)}, ${lng.toFixed(5)}. Fetching address...`;
+        const resolvedAddress = await reverseGeocode(lat, lng);
+        mapPickerState.selectedAddress = resolvedAddress;
+        if (status) {
+          status.textContent = resolvedAddress
+            ? `Selected: ${resolvedAddress}`
+            : `Selected: ${lat.toFixed(5)}, ${lng.toFixed(5)} (address unavailable)`;
+        }
+      });
+    } else {
+      mapPickerState.map.setView([startLat, startLng], 13);
+    }
+
+    if (cartState.deliveryLocation) {
+      const { lat, lng } = cartState.deliveryLocation;
+      mapPickerState.selectedLatLng = { lat, lng };
+      mapPickerState.selectedAddress = cartState.deliveryLocation.addressText || '';
+      mapPickerState.selectedMapLink = cartState.deliveryLocation.mapLink || buildGoogleMapsLink(lat, lng);
+      if (!mapPickerState.marker) {
+        mapPickerState.marker = window.L.marker([lat, lng], { draggable: false }).addTo(mapPickerState.map);
+      } else {
+        mapPickerState.marker.setLatLng([lat, lng]);
+      }
+      if (status) status.textContent = cartState.deliveryLocation.addressText || `Selected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    } else if (status) {
+      status.textContent = 'Tap anywhere on map to select delivery location.';
+    }
+
+    window.setTimeout(() => {
+      if (mapPickerState.map) mapPickerState.map.invalidateSize();
+    }, 120);
+  } catch (_error) {
+    if (status) status.textContent = 'Unable to load map. Please retry.';
+  }
 }
 
 function mountNavCartButton() {
@@ -1388,14 +1819,14 @@ function mountCartShell() {
           <div class="shipping-row">
             <label for="shippingSelect" class="subtle">Shipping</label>
             <select class="chip select shipping-select" id="shippingSelect" aria-label="Select shipping">
-              <option value="standard">Standard (Rs 79)</option>
-              <option value="express">Express (Rs 199)</option>
+              <option value="delivery">Delivery (Rs 13 / km)</option>
               <option value="pickup">Store Pickup (Free)</option>
             </select>
+            <p class="subtle delivery-note" id="deliveryDistanceInfo">Select delivery location on map to calculate charges.</p>
           </div>
           <div class="summary-grid">
             <div class="summary-row"><span>Subtotal</span><strong id="sumSubtotal">Rs 0</strong></div>
-            <div class="summary-row"><span>Shipping</span><strong id="sumShipping">Rs 0</strong></div>
+            <div class="summary-row"><span id="sumShippingLabel">Shipping</span><strong id="sumShipping">Rs 0</strong></div>
             <div class="summary-row"><span>Tax (5%)</span><strong id="sumTax">Rs 0</strong></div>
             <div class="summary-row total"><span>Total</span><strong id="sumTotal">Rs 0</strong></div>
           </div>
@@ -1403,7 +1834,19 @@ function mountCartShell() {
             <input class="form-input cart-input" name="fullName" type="text" placeholder="Full name" required />
             <input class="form-input cart-input" name="phone" type="tel" placeholder="Phone" required />
             <input class="form-input cart-input" name="email" type="email" placeholder="Email (optional)" />
-            <textarea class="form-input cart-input" name="address" placeholder="Delivery address" rows="2" required></textarea>
+            <div class="map-address-wrap" id="mapAddressWrap">
+              <label class="subtle" for="deliveryAddress">Delivery address</label>
+              <textarea
+                class="form-input cart-input"
+                id="deliveryAddress"
+                name="address"
+                placeholder="Pick location on map to auto-fill Google Maps link"
+                rows="2"
+                readonly
+                required
+              ></textarea>
+              <button class="chip map-picker-btn" id="pickOnMapBtn" type="button">Pick on map</button>
+            </div>
             <div class="checkout-grid">
               <input class="form-input cart-input" name="city" type="text" placeholder="City" value="Jaipur" required />
               <input class="form-input cart-input" name="pincode" type="text" placeholder="Pincode" required />
@@ -1411,13 +1854,28 @@ function mountCartShell() {
             <select class="form-input cart-input" name="payment" aria-label="Payment method" required>
               <option value="UPI">UPI</option>
               <option value="Cash on Delivery">Cash on Delivery</option>
-              <option value="Card on Delivery">Card on Delivery</option>
             </select>
             <button class="btn btn-primary checkout-btn" type="submit">Place order on WhatsApp</button>
           </form>
           <button class="btn btn-ghost clear-cart-btn" id="clearCartBtn" type="button">Clear cart</button>
         </div>
       </aside>
+      <div class="modal hidden map-picker-modal" id="mapPickerModal" role="dialog" aria-modal="true" aria-labelledby="mapPickerTitle">
+        <div class="modal-backdrop" data-close-map></div>
+        <div class="modal-card glass-panel map-picker-card">
+          <button class="modal-close" type="button" data-close-map aria-label="Close map picker">x</button>
+          <div class="map-picker-body">
+            <h3 id="mapPickerTitle">Set delivery location</h3>
+            <p class="subtle">Tap the map to pin your location. We will auto-fill a Google Maps link in address.</p>
+            <div class="map-picker-canvas" id="mapPickerCanvas" aria-label="Delivery location map"></div>
+            <p class="subtle" id="mapPickerStatus">Tap anywhere on map to select location.</p>
+            <div class="map-picker-actions">
+              <button class="btn btn-ghost" type="button" data-close-map>Cancel</button>
+              <button class="btn btn-primary" id="mapUseLocationBtn" type="button">Use this location</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="cart-toast" id="cartToast" role="status" aria-live="polite"></div>
     `
   );
@@ -1430,9 +1888,26 @@ function renderCart() {
   const cartItemsEl = document.getElementById('cartItems');
   const cartEmptyEl = document.getElementById('cartEmpty');
   const shippingSelect = document.getElementById('shippingSelect');
+  const mapAddressWrap = document.getElementById('mapAddressWrap');
+  const addressInput = document.getElementById('deliveryAddress');
+  const deliveryDistanceInfo = document.getElementById('deliveryDistanceInfo');
+  const sumShippingLabel = document.getElementById('sumShippingLabel');
   if (!cartItemsEl || !cartEmptyEl) return;
 
   if (shippingSelect) shippingSelect.value = cartState.shipping;
+  if (addressInput instanceof HTMLTextAreaElement && cartState.deliveryLocation) {
+    const location = cartState.deliveryLocation;
+    const prefix = location.addressText ? `${location.addressText} | ` : '';
+    if (!String(addressInput.value || '').trim()) {
+      addressInput.value = `${prefix}${location.mapLink}`;
+    }
+  }
+
+  const isPickup = cartState.shipping === 'pickup';
+  if (mapAddressWrap) mapAddressWrap.classList.toggle('hidden', isPickup);
+  if (addressInput instanceof HTMLTextAreaElement) {
+    addressInput.required = !isPickup;
+  }
 
   const count = cartState.items.reduce((sum, item) => sum + item.qty, 0);
   document.querySelectorAll('.cart-count').forEach((node) => {
@@ -1469,6 +1944,20 @@ function renderCart() {
   const sumShipping = document.getElementById('sumShipping');
   const sumTax = document.getElementById('sumTax');
   const sumTotal = document.getElementById('sumTotal');
+
+  if (sumShippingLabel) {
+    sumShippingLabel.textContent = isPickup ? 'Shipping (Pickup)' : `Shipping (${DELIVERY_RATE_PER_KM}/km)`;
+  }
+
+  if (deliveryDistanceInfo) {
+    if (isPickup) {
+      deliveryDistanceInfo.textContent = 'Pickup selected. Delivery charge is not applied.';
+    } else if (totals.distanceKm > 0) {
+      deliveryDistanceInfo.textContent = `Distance: ${formatDistanceKm(totals.distanceKm)} · Charge: ${formatCurrency(totals.shipping)}`;
+    } else {
+      deliveryDistanceInfo.textContent = 'Pick delivery location on map to calculate charge.';
+    }
+  }
 
   if (sumSubtotal) sumSubtotal.textContent = formatCurrency(totals.subtotal);
   if (sumShipping) sumShipping.textContent = formatCurrency(totals.shipping);
@@ -1568,9 +2057,15 @@ function checkoutOrder(form) {
   const city = String(formData.get('city') || '').trim();
   const pincode = String(formData.get('pincode') || '').trim();
   const payment = String(formData.get('payment') || 'UPI').trim();
+  const isPickup = cartState.shipping === 'pickup';
 
-  if (!fullName || !phone || !address || !city || !pincode) {
+  if (!fullName || !phone || !city || !pincode || (!isPickup && !address)) {
     showCartToast('Fill all required checkout fields');
+    return;
+  }
+
+  if (!isPickup && !cartState.deliveryLocation) {
+    showCartToast('Pick delivery location on map');
     return;
   }
 
@@ -1579,17 +2074,24 @@ function checkoutOrder(form) {
     .map((item, index) => `${index + 1}. ${item.name} x${item.qty} = ${formatCurrency(item.qty * item.price)}`)
     .join('\n');
 
+  const shippingLabel = isPickup
+    ? 'Store Pickup'
+    : `Delivery (${formatDistanceKm(totals.distanceKm)} @ Rs ${DELIVERY_RATE_PER_KM}/km)`;
+  const deliveryLocationLink =
+    !isPickup && cartState.deliveryLocation ? cartState.deliveryLocation.mapLink : 'Not required for pickup';
+
   const message = [
     'New Order from SHEESHA HOOKAH Website',
     '',
     `Name: ${fullName}`,
     `Phone: ${phone}`,
     `Email: ${email || 'Not provided'}`,
-    `Address: ${address}`,
+    `Address: ${isPickup ? 'Store Pickup' : address}`,
     `City: ${city}`,
     `Pincode: ${pincode}`,
     `Payment: ${payment}`,
-    `Shipping: ${cartState.shipping}`,
+    `Shipping: ${shippingLabel}`,
+    `Location link: ${deliveryLocationLink}`,
     '',
     'Items:',
     itemsText,
