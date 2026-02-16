@@ -1,90 +1,130 @@
 window.sheeshaProducts = [
   {
-    id: 'classic-brass-hookah',
-    name: 'Classic Brass Hookah',
-    type: 'traditional',
-    price: 3499,
-    badge: 'Limited',
-    note: 'Hand-etched stem, velvet hose',
-    image: 'assets/gallery/Classic-Brass-Hookah.jpg',
-    images: ['assets/gallery/Classic-Brass-Hookah.jpg', 'assets/gallery/Traditional-Brass-Hookah.jpg'],
-    rating: 4.8
+    "id": "stash-pro-sheesha-s3-rose-tint",
+    "name": "stash-pro Sheesha S3 Rose Tint",
+    "type": "traditional",
+    "price": 4100,
+    "badge": "Featured",
+    "note": "Premium quality selection",
+    "image": "assets/gallery/stash-pro-sheesha-s3-rose-tint-01.webp",
+    "images": [
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-01.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-02.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-03.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-04.webp"
+    ],
+    "rating": 4.8
   },
   {
-    id: 'modern-glass-tower',
-    name: 'Modern Glass Tower',
-    type: 'glass',
-    price: 5999,
-    badge: 'New',
-    note: 'Borosilicate, diffused downstem',
-    image: 'assets/gallery/premium-glass-hookah.jpg',
-    images: ['assets/gallery/premium-glass-hookah.jpg', 'assets/gallery/shop-front.jpg'],
-    rating: 4.9
+    "id": "classic-brass-hookah",
+    "name": "Classic Brass Hookah",
+    "type": "traditional",
+    "price": 3499,
+    "badge": "Limited",
+    "note": "Hand-etched stem, velvet hose",
+    "image": "assets/gallery/Classic-Brass-Hookah.jpg",
+    "images": [
+      "assets/gallery/Classic-Brass-Hookah.jpg",
+      "assets/gallery/Traditional-Brass-Hookah.jpg"
+    ],
+    "rating": 4.8
   },
   {
-    id: 'mini-portable-hookah',
-    name: 'Mini Portable Hookah',
-    type: 'glass',
-    price: 1999,
-    badge: 'Staff Pick',
-    note: 'Travel case, silicone hose',
-    image: 'assets/gallery/shop-front.jpg',
-    images: ['assets/gallery/shop-front.jpg', 'assets/gallery/premium-glass-hookah.jpg'],
-    rating: 4.6
+    "id": "modern-glass-tower",
+    "name": "Modern Glass Tower",
+    "type": "glass",
+    "price": 5999,
+    "badge": "New",
+    "note": "Borosilicate, diffused downstem",
+    "image": "assets/gallery/premium-glass-hookah.jpg",
+    "images": [
+      "assets/gallery/premium-glass-hookah.jpg",
+      "assets/gallery/shop-front.jpg"
+    ],
+    "rating": 4.9
   },
   {
-    id: 'premium-clay-chillum',
-    name: 'Premium Clay Chillum',
-    type: 'accessories',
-    price: 499,
-    badge: 'New',
-    note: 'Heat retaining bowl',
-    image: 'assets/gallery/owner.jpg',
-    images: ['assets/gallery/owner.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
-    rating: 4.5
+    "id": "mini-portable-hookah",
+    "name": "Mini Portable Hookah",
+    "type": "glass",
+    "price": 1999,
+    "badge": "Staff Pick",
+    "note": "Travel case, silicone hose",
+    "image": "assets/gallery/shop-front.jpg",
+    "images": [
+      "assets/gallery/shop-front.jpg",
+      "assets/gallery/premium-glass-hookah.jpg"
+    ],
+    "rating": 4.6
   },
   {
-    id: 'coconut-charcoal-1kg',
-    name: 'Coconut Charcoal (1kg)',
-    type: 'accessories',
-    price: 299,
-    badge: 'Fast Moving',
-    note: 'Low ash, long burn',
-    image: 'assets/gallery/shop-front.jpg',
-    images: ['assets/gallery/shop-front.jpg', 'assets/gallery/owner.jpg'],
-    rating: 4.7
+    "id": "premium-clay-chillum",
+    "name": "Premium Clay Chillum",
+    "type": "accessories",
+    "price": 499,
+    "badge": "New",
+    "note": "Heat retaining bowl",
+    "image": "assets/gallery/owner.jpg",
+    "images": [
+      "assets/gallery/owner.jpg",
+      "assets/gallery/Classic-Brass-Hookah.jpg"
+    ],
+    "rating": 4.5
   },
   {
-    id: 'double-apple-flavor',
-    name: 'Double Apple Flavor',
-    type: 'flavors',
-    price: 149,
-    badge: 'Classic',
-    note: 'Rich anise finish',
-    image: 'assets/gallery/Traditional-Brass-Hookah.jpg',
-    images: ['assets/gallery/Traditional-Brass-Hookah.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
-    rating: 4.7
+    "id": "coconut-charcoal-1kg",
+    "name": "Coconut Charcoal (1kg)",
+    "type": "accessories",
+    "price": 299,
+    "badge": "Fast Moving",
+    "note": "Low ash, long burn",
+    "image": "assets/gallery/shop-front.jpg",
+    "images": [
+      "assets/gallery/shop-front.jpg",
+      "assets/gallery/owner.jpg"
+    ],
+    "rating": 4.7
   },
   {
-    id: 'mint-frost-flavor',
-    name: 'Mint Frost Flavor',
-    type: 'flavors',
-    price: 149,
-    badge: 'Fresh',
-    note: 'Cooling mint cloud',
-    image: 'assets/gallery/premium-glass-hookah.jpg',
-    images: ['assets/gallery/premium-glass-hookah.jpg', 'assets/gallery/Traditional-Brass-Hookah.jpg'],
-    rating: 4.8
+    "id": "double-apple-flavor",
+    "name": "Double Apple Flavor",
+    "type": "flavors",
+    "price": 149,
+    "badge": "Classic",
+    "note": "Rich anise finish",
+    "image": "assets/gallery/Traditional-Brass-Hookah.jpg",
+    "images": [
+      "assets/gallery/Traditional-Brass-Hookah.jpg",
+      "assets/gallery/Classic-Brass-Hookah.jpg"
+    ],
+    "rating": 4.7
   },
   {
-    id: 'antique-brass-design',
-    name: 'Antique Brass Design',
-    type: 'traditional',
-    price: 4499,
-    badge: 'Limited',
-    note: 'Collector edition',
-    image: 'assets/gallery/Traditional-Brass-Hookah.jpg',
-    images: ['assets/gallery/Traditional-Brass-Hookah.jpg', 'assets/gallery/Classic-Brass-Hookah.jpg'],
-    rating: 4.8
+    "id": "mint-frost-flavor",
+    "name": "Mint Frost Flavor",
+    "type": "flavors",
+    "price": 149,
+    "badge": "Fresh",
+    "note": "Cooling mint cloud",
+    "image": "assets/gallery/premium-glass-hookah.jpg",
+    "images": [
+      "assets/gallery/premium-glass-hookah.jpg",
+      "assets/gallery/Traditional-Brass-Hookah.jpg"
+    ],
+    "rating": 4.8
+  },
+  {
+    "id": "antique-brass-design",
+    "name": "Antique Brass Design",
+    "type": "traditional",
+    "price": 4499,
+    "badge": "Limited",
+    "note": "Collector edition",
+    "image": "assets/gallery/Traditional-Brass-Hookah.jpg",
+    "images": [
+      "assets/gallery/Traditional-Brass-Hookah.jpg",
+      "assets/gallery/Classic-Brass-Hookah.jpg"
+    ],
+    "rating": 4.8
   }
 ];
