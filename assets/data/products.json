@@ -1,5 +1,21 @@
 [
   {
+    "id": "stash-pro-sheesha-s3-rose-tint",
+    "name": "stash-pro Sheesha S3 Rose Tint",
+    "type": "traditional",
+    "price": 4100,
+    "badge": "Featured",
+    "note": "Premium quality selection",
+    "image": "assets/gallery/stash-pro-sheesha-s3-rose-tint-01.webp",
+    "images": [
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-01.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-02.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-03.webp",
+      "assets/gallery/stash-pro-sheesha-s3-rose-tint-04.webp"
+    ],
+    "rating": 4.8
+  },
+  {
     "id": "classic-brass-hookah",
     "name": "Classic Brass Hookah",
     "type": "traditional",
